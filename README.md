@@ -18,33 +18,33 @@ This report describes how our **agentic RAG** system will work end‑to‑end us
 ```mermaid
 flowchart LR
   subgraph Client["Web Client (React/Vite)"]
-    UI[Home • Uploads • Report View • Chat • Profile]
+    UI[Home, Uploads, Report View, Chat, Profile]
   end
 
-  subgraph API["Backend API (Express/Mongo)"]
+  subgraph API["Backend API (Express + Mongo)"]
     AUTH[Auth & Sessions]
     UP[Uploads]
     REP[Reports API]
-    CHAT[Agents/Chat API]
-    Q[Queue (BullMQ/RabbitMQ)]
-    DB[(MongoDB)]
-    OBJ[(Object Storage: S3/MinIO)]
+    CHAT[Agents / Chat API]
+    Q["Queue (BullMQ or RabbitMQ)"]
+    DB["MongoDB"]
+    OBJ["Object Storage: S3 or MinIO"]
   end
 
   subgraph AIS["AI Services (FastAPI)"]
     OCR[Ingestion & OCR]
     NORM[Units & Ref Range Normalizer]
     CLS[Status Classifier]
-    IDX[Embedding/Indexing]
+    IDX[Embedding / Indexing]
     SUM[Summary Agent]
     TRN[Term Translator]
-    EDU[Education/Advice Agent]
+    EDU[Education / Advice Agent]
     RAG[RAG Chat Agent]
     SAFE[Safety & Citation Checker]
-    VDB[(Vector Store: Chroma/FAISS/Qdrant)]
+    VDB["Vector Store: Chroma · FAISS · Qdrant"]
   end
 
-  OBS[Observability: Logs / Traces / Metrics]
+  OBS[Observability: Logs · Traces · Metrics]
 
   UI -->|JWT cookie| AUTH
   UI -->|Upload| UP
@@ -60,7 +60,7 @@ flowchart LR
   CHAT --> RAG --> VDB
   RAG --> SAFE --> CHAT
 
-  %% Observability taps into key components (dotted lines)
+  %% Observability taps (dotted)
   OBS -.-> AUTH
   OBS -.-> REP
   OBS -.-> CHAT
