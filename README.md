@@ -74,6 +74,50 @@ flowchart LR
 - **Async processing** pipeline for uploads; sync chat endpoints with quick SLAs.
 - **Grounded outputs** with explicit **citations** back to report/page/test.
 
+## Agent Communication Protocol (HTTP + JSON)
+**Why**: auditable, provider‑agnostic, PHI‑safe, testable with Postman. (Future: optional MCP as internal tool bus.)
+
+**Transport and versioning**
+- HTTP/1.1, `Content-Type: application/json; charset=utf-8`
+- Path versioning: `/ai/v1/*`; header `X-API-Version: 1`
+- Timeouts: OCR 60s; retrieval or verify 15s; chat 30s (optionally streaming later)
+- Retries: only idempotent ops (max 2 on 502 or 503 or 504)
+
+**Security and privacy**
+- Service auth: `Authorization: Bearer <service-jwt>` (rotated). User JWT never leaves backend.
+- Headers: `X-Request-ID`, `traceparent`, `X-User-Id`, `X-Consent-History`, `X-Consent-Compare`
+- Network: private VPC; option for mTLS; PII minimal (use ids, not NIC or phone)
+
+**Response envelope**
+```json
+{ "ok": true, "data": { }, "requestId": "..." }
+```
+**Errors** use a canonical set: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `RATE_LIMITED`, `CONFLICT`, `UPSTREAM_TIMEOUT`, `UPSTREAM_ERROR`, `VALIDATION_FAILED`, `INTERNAL`.
+
+**Sequence (GitHub‑safe)**
+```mermaid
+sequenceDiagram
+  participant UI as Client UI
+  participant EX as Orchestrator
+  participant AI as AI Service
+  participant V as Vector DB
+
+  UI->>EX: POST /api/agents/chat (cookie JWT)
+  EX->>AI: POST /ai/v1/retrieve (service JWT)
+  AI->>V: vector search (user namespace)
+  V-->>AI: top k chunks
+  EX->>AI: POST /ai/v1/chat (messages, reportIds)
+  AI-->>EX: answer + citations
+  EX-->>UI: render response
+```
+
+**Endpoint contracts (concise)**
+- `/ai/v1/ingest` → `{ userId, reportId, objectKey }` → `{ parsedKey, pages, tables }`
+- `/ai/v1/normalize` → `{ userId, reportId, parsedKey, patient }` → `{ rows[] }`
+- `/ai/v1/index` → `{ userId, reportId, sections[] }` → `{ chunks, namespace }`
+- `/ai/v1/retrieve` → `{ userId, reportIds?, query, k, filters? }` → `{ results[] }`
+- `/ai/v1/chat` → `{ userId, reportIds?, messages[], mode, useHistory }` → `{ answer, citations[], trend? }`
+- `/ai/v1/verify` → `{ userId, draft, sources[] }` → `{ verified, disclaimer, redFlags[] }`
 ---
 
 ## 3) Memory model (final)
