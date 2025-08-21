@@ -13,7 +13,7 @@ client = genai.Client(api_key=API_KEY)
 
 # Generate content using the Gemini model
 response = client.models.generate_content(
-    model="gemini-2.5-flash", contents="Explain how AI works in a few words"
+    model="gemini-2.5-flash", contents="write an essay about a toy  100 words"
 )
 
 # Print the response text
