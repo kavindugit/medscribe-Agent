@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 # ---------- Load Env & Gemini Config ----------
 load_dotenv()
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")  # Default free-tier friendly
+MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")  # free tier–friendly
 API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not API_KEY:
@@ -35,7 +35,6 @@ def _safe_decode(raw: bytes) -> str:
     except Exception:
         return raw.decode("latin-1", errors="ignore")
 
-
 def _extract_text_from_pdf(raw: bytes) -> str:
     """Extract text from a PDF file."""
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -51,7 +50,6 @@ def _extract_text_from_pdf(raw: bytes) -> str:
         except Exception:
             pass
 
-
 def _extract_text_from_docx(raw: bytes) -> str:
     """Extract text from a DOCX file."""
     with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
@@ -66,14 +64,12 @@ def _extract_text_from_docx(raw: bytes) -> str:
         except Exception:
             pass
 
-
 def _normalize_whitespace(s: str) -> str:
     """Clean up whitespace & null chars."""
     s = s.replace("\x00", " ")
     s = re.sub(r"[ \t]+", " ", s)
     s = re.sub(r"\n{3,}", "\n\n", s)
     return s.strip()
-
 
 def _chunk(text: str, max_chars: int = 12000) -> List[str]:
     """Split long text into chunks to avoid token limits."""
@@ -89,7 +85,6 @@ def _chunk(text: str, max_chars: int = 12000) -> List[str]:
         chunks.append(text[start:nl])
         start = nl
     return chunks
-
 
 def _extract_json_candidate(s: str) -> Dict:
     """Try to parse JSON from Gemini response."""
@@ -109,14 +104,13 @@ def _extract_json_candidate(s: str) -> Dict:
             pass
     return {"raw": s}
 
-
 def _gemini_prompt(chunk_text: str) -> str:
     """Prompt for Member C Agent tasks."""
     return f"""
 You are the *Member C agent* for a medical report assistant. Your job:
 
 1) Explain in plain language what the report means (no diagnosis).
-2) Build a bilingual glossary (English + Sinhala) for technical terms.
+2) Build a bilingual glossary (English + Sinhala) for technical terms found.
 3) Provide neutral, non-diagnostic lifestyle recommendations.
 4) Add a clear disclaimer.
 5) If you mention any numeric result, include a citation (quote exact line).
@@ -149,12 +143,12 @@ Return strict JSON in this shape:
 
 Rules:
 - Neutral tone. NEVER diagnose or prescribe.
+- If no data, return empty strings/arrays.
 - Always return valid JSON.
 """
 
-
 async def _analyze_with_gemini(text: str) -> Dict:
-    """Analyze text with Gemini and merge responses."""
+    """Analyze text with Gemini and merge responses across chunks."""
     chunks = _chunk(text, max_chars=12000)
 
     partials: List[Dict] = []
@@ -164,41 +158,65 @@ async def _analyze_with_gemini(text: str) -> Dict:
         data = _extract_json_candidate(resp.text)
         partials.append(data)
 
-    merged = {"meaning": "", "glossary": [], "recommendations": [], "disclaimer": "", "citations": []}
+    merged: Dict = {
+        "meaning": "",
+        "glossary": [],
+        "recommendations": [],
+        "disclaimer": "",
+        "citations": [],
+    }
 
-    meaning_parts, seen_terms, seen_reco, seen_quotes = [], set(), set(), set()
+    meaning_parts: List[str] = []
+    seen_terms, seen_reco, seen_quotes = set(), set(), set()
 
     for part in partials:
-        if isinstance(part, dict):
-            if part.get("meaning"):
-                meaning_parts.append(part["meaning"])
+        if not isinstance(part, dict):
+            continue
 
-            for g in part.get("glossary", []):
-                term = (g.get("term") or "").strip().lower()
-                if term and term not in seen_terms:
-                    merged["glossary"].append(g)
-                    seen_terms.add(term)
+        if part.get("meaning"):
+            meaning_parts.append(part["meaning"])
 
-            for r in part.get("recommendations", []):
-                if r and r not in seen_reco:
-                    merged["recommendations"].append(r)
-                    seen_reco.add(r)
+        for g in part.get("glossary", []) or []:
+            term = (g.get("term") or "").strip().lower()
+            if term and term not in seen_terms:
+                merged["glossary"].append(g)
+                seen_terms.add(term)
 
-            if part.get("disclaimer") and not merged["disclaimer"]:
-                merged["disclaimer"] = part["disclaimer"]
+        for r in part.get("recommendations", []) or []:
+            r_norm = (r or "").strip()
+            if r_norm and r_norm not in seen_reco:
+                merged["recommendations"].append(r_norm)
+                seen_reco.add(r_norm)
 
-            for c in part.get("citations", []):
-                q = (c.get("quote") or "").strip()
-                if q and q not in seen_quotes:
-                    merged["citations"].append(c)
-                    seen_quotes.add(q)
+        if part.get("disclaimer") and not merged["disclaimer"]:
+            merged["disclaimer"] = part["disclaimer"]
 
-    merged["meaning"] = " ".join(meaning_parts)[:1200].strip()
+        for c in part.get("citations", []) or []:
+            q = (c.get("quote") or "").strip()
+            if q and q not in seen_quotes:
+                merged["citations"].append(c)
+                seen_quotes.add(q)
+
+    merged["meaning"] = " ".join(meaning_parts).strip()[:1200]
     if not merged["disclaimer"]:
-        merged["disclaimer"] = "This is educational only and not a medical diagnosis. Please consult a healthcare professional."
+        merged["disclaimer"] = (
+            "This is educational only and not a medical diagnosis. "
+            "Please consult a qualified healthcare professional."
+        )
+
+    # ✅ Transform glossary to a friendlier bilingual display
+    pretty_glossary = []
+    for g in merged.get("glossary", []):
+        pretty_glossary.append({
+            "term": g.get("term"),
+            "definitions": {
+                "English": g.get("definition_en"),
+                "සිංහල": g.get("definition_si"),
+            }
+        })
+    merged["glossary"] = pretty_glossary
 
     return merged
-
 
 # ---------- Public API ----------
 async def process_report(file: UploadFile) -> Dict:
@@ -217,9 +235,14 @@ async def process_report(file: UploadFile) -> Dict:
 
     text = _normalize_whitespace(text)
     if len(text) < 20:
-        raise HTTPException(status_code=400, detail="Could not extract meaningful text from file.")
+        raise HTTPException(
+            status_code=400,
+            detail="Could not extract meaningful text from file. Please upload a PDF/DOCX/TXT with text."
+        )
 
     try:
         return await _analyze_with_gemini(text)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
