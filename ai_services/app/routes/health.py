@@ -1,7 +1,8 @@
+# app/routes/health.py
 from fastapi import APIRouter
 
-health_router = APIRouter()
+router = APIRouter(prefix="/health", tags=["health"])
 
-@health_router.get("/")
-async def health():
-    return {"status": "ok", "service": "ai_services", "version": "0.1.0"}
+@router.get("/")
+def health_check():
+    return {"status": "ok"}
