@@ -31,3 +31,8 @@ def load_vectorstore(case_id: str, embeddings):
     with open(pkl_path, "rb") as f:
         meta = pickle.load(f)
     return FAISS(embedding_function=embeddings, index=index, **meta)
+
+def has_index(case_id: str) -> bool:
+    idx, meta = faiss_paths(case_id)
+    return idx.exists() and meta.exists()
+
