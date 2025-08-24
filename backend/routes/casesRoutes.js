@@ -1,11 +1,13 @@
 import express from "express";
 import multer from "multer";
+import userAuth from "../middleware/userAuth.js";
 import {
   createCase,
   getCaseRaw,
   getCaseData,
   getCaseMeta,
   exportCase,
+  getCleaned,
 } from "../controllers/casesController.js";
 
 const MAX_UPLOAD_MB = parseInt(process.env.MAX_UPLOAD_MB || "25", 10);
@@ -17,5 +19,6 @@ casesRouter.get("/:id/raw", getCaseRaw);
 casesRouter.get("/:id/data", getCaseData);
 casesRouter.get("/:id/meta", getCaseMeta);
 casesRouter.get("/:id/export", exportCase);
+casesRouter.get("/:id/cleaned", userAuth , getCleaned);
 
 export default casesRouter;
