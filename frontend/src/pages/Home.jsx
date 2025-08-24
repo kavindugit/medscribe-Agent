@@ -35,7 +35,7 @@ export default function HomePage() {
         `${backendUrl}/api/cases/${data.case_id}/raw`,
         {
           withCredentials: true,
-          headers: { "X-User-Id": userData.id },
+          headers: { "X-User-Id": userData.userId },
         }
       );
       setRawText(raw.data.text || JSON.stringify(raw.data, null, 2));
