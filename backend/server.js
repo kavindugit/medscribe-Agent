@@ -6,6 +6,7 @@ import connectDB from "./config/mongodb.js";
 import authRouter from "./routes/authRoutes.js";
 import userRouter from "./routes/userRouter.js";
 import casesRouter from "./routes/casesRoutes.js";
+import indexRouter from "./routes/indexRoutes.js";
 
 
 const app = express();
@@ -20,6 +21,8 @@ app.use(cors({origin:allowedOrigins , credentials: true}))
 app.use('/api/auth',authRouter );
 app.use('/api/user',userRouter);
 app.use('/api/cases', casesRouter);
+app.use('/api/index', indexRouter);
+
 
 app.listen(PORT,()=> console.log(`Server is running on port ${PORT}`));
 

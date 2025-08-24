@@ -9,7 +9,6 @@ export default function HomePage() {
 
   const [file, setFile] = useState(null);
   const [caseId, setCaseId] = useState("");
-  const [rawText, setRawText] = useState("");
 
   // Upload handler
   const onUpload = async () => {
@@ -20,27 +19,24 @@ export default function HomePage() {
     form.append("file", file);
 
     try {
-      const { data } = await axios.post(
-        `${backendUrl}/api/cases`,
-        form,
-        {
-          withCredentials: true,
-          headers: { "X-User-Id": userData.userId },
-        }
-      );
+      // 1) create case
+      const { data } = await axios.post(`${backendUrl}/api/cases`, form, {
+        withCredentials: true,
+        headers: { "X-User-Id": userData.userId },
+      });
       setCaseId(data.case_id);
 
-      // fetch raw text immediately
-      const raw = await axios.get(
-        `${backendUrl}/api/cases/${data.case_id}/raw`,
+      // 2) fetch cleaned (no on-screen preview; just log)
+      const cleaned = await axios.get(
+        `${backendUrl}/api/cases/${data.case_id}/cleaned`,
         {
           withCredentials: true,
           headers: { "X-User-Id": userData.userId },
         }
       );
-      setRawText(raw.data.text || JSON.stringify(raw.data, null, 2));
+      console.log("cleaned:", cleaned.data); // e.g., cleaned.sections.labs_block
     } catch (err) {
-      console.error(err);
+      console.error(err?.response?.data || err.message);
       alert("Upload failed");
     }
   };
@@ -171,9 +167,7 @@ export default function HomePage() {
                     <p className="text-xs text-neutral-300">
                       Uploaded ✅ Case ID: {caseId}
                     </p>
-                    <pre className="mt-2 max-h-40 overflow-y-auto rounded bg-black/40 p-2 text-xs text-neutral-200">
-                      {rawText}
-                    </pre>
+                    {/* Removed raw text preview as requested */}
                   </div>
                 )}
               </div>
@@ -264,15 +258,11 @@ function StethoscopeBackdrop() {
     <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-60">
       <div
         className="absolute -top-40 -right-40 h-[38rem] w-[38rem] rounded-full blur-3xl"
-        style={{
-          background: "radial-gradient(closest-side,#22d3ee22,transparent)",
-        }}
+        style={{ background: "radial-gradient(closest-side,#22d3ee22,transparent)" }}
       />
       <div
         className="absolute -bottom-40 -left-40 h-[38rem] w-[38rem] rounded-full blur-3xl"
-        style={{
-          background: "radial-gradient(closest-side,#a78bfa22,transparent)",
-        }}
+        style={{ background: "radial-gradient(closest-side,#a78bfa22,transparent)" }}
       />
     </div>
   );
