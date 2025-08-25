@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, List, Dict
-
 from app.models.domain import Panel  # if you store panels as Pydantic objects
 
 ROOT = Path("storage") / "cases"
@@ -22,7 +21,6 @@ def _ensure_case_dir(case_id: str) -> Path:
 def put_json(case_id: str, filename: str, data: Any) -> None:
     d = _ensure_case_dir(case_id)
     p = d / filename
-    # Ensure Pydantic models become plain dicts
     if hasattr(data, "model_dump"):
         data = data.model_dump()
     with p.open("w", encoding="utf-8") as f:
@@ -49,7 +47,6 @@ def save_case(
 ) -> None:
     d = _ensure_case_dir(case_id)
 
-    # meta
     meta = {
         "case_id": case_id,
         "user_id": user_id,
@@ -59,10 +56,8 @@ def save_case(
     }
     (d / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
-    # raw text
     (d / "raw.txt").write_text(raw_text or "", encoding="utf-8")
 
-    # panels (convert pydantic to dicts if needed)
     serializable = []
     for p in panels:
         if hasattr(p, "model_dump"):
@@ -82,3 +77,22 @@ def load_raw(case_id: str) -> str:
 def load_panels(case_id: str) -> Any:
     p = _case_dir(case_id) / "panels.json"
     return json.loads(p.read_text(encoding="utf-8"))
+
+def list_cases_for_user(user_id: str) -> List[str]:
+    """
+    Scan storage/cases/*/meta.json and return case_ids owned by user_id.
+    """
+    out: List[str] = []
+    for case_dir in ROOT.glob("*"):
+        if not case_dir.is_dir():
+            continue
+        meta_path = case_dir / "meta.json"
+        if not meta_path.exists():
+            continue
+        try:
+            data = json.loads(meta_path.read_text(encoding="utf-8"))
+            if data.get("user_id") == user_id:
+                out.append(case_dir.name)
+        except Exception:
+            continue
+    return out
