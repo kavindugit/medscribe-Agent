@@ -3,13 +3,17 @@ from __future__ import annotations
 import os
 from typing import List
 from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings  # <— local, no API
+from langchain_huggingface import HuggingFaceEmbeddings  # local, no API
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 
 from app.storage import get_json
-from app.storage.cases import load_raw
-from app.storage.faiss_store import save_vectorstore, has_index
+from app.storage.cases import load_raw, load_meta
+from app.storage.faiss_store import (
+    save_case_vs, save_user_vs,
+    has_index, has_user_index,
+    load_user_vs,
+)
 
 MODEL_NAME = os.getenv("HF_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
@@ -57,14 +61,36 @@ def build_index_hf(case_id: str) -> int:
 
     # 4) local embeddings (no API / no key)
     embeddings = HuggingFaceEmbeddings(model_name=MODEL_NAME)
-    vs = FAISS.from_documents(chunks, embedding=embeddings)
-    save_vectorstore(vs, case_id)
+    vs_case = FAISS.from_documents(chunks, embedding=embeddings)
+
+    # save per-case index
+    save_case_vs(vs_case, case_id)
     print(f"[index] built {len(chunks)} chunks for {case_id}")
+
+    # 5) also merge into per-user aggregated index
+    try:
+        meta = load_meta(case_id)
+        user_id = meta.get("user_id") or "anon"
+
+        if has_user_index(user_id):
+            vs_user = load_user_vs(user_id, embeddings)
+            # merge in-memory
+            vs_user.merge_from(vs_case)
+        else:
+            vs_user = vs_case  # first case for this user
+
+        save_user_vs(vs_user, user_id)
+        print(f"[user-index] merged case {case_id} into user {user_id}")
+    except Exception as e:
+        import sys, traceback
+        print(f"[user-index] merge failed for case {case_id}: {e}", file=sys.stderr)
+        traceback.print_exc()
+
     return len(chunks)
 
 def build_index_background(case_id: str) -> None:
     try:
-        if has_index(case_id):
+        if has_index(case_id, scope="case"):
             print(f"[index] case {case_id}: already indexed; skipping")
             return
         build_index_hf(case_id)
