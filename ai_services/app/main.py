@@ -4,7 +4,9 @@ from app.routes.ingest import router as ingest_router
 from app.routes.cases import router as cases_router
 from app.routes.chat import router as chat_router
 from app.routes.users import router as users_router
+
 from app.routes.classifier import router as classifier_router
+from app.routes.translator import router as translator_router
 
 
 from dotenv import load_dotenv
@@ -20,6 +22,8 @@ app.include_router(cases_router)
 app.include_router(chat_router)
 app.include_router(users_router)
 app.include_router(classifier_router)
+app.include_router(translator_router)
+
 
 
 
