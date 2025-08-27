@@ -1,5 +1,7 @@
 # app/orchestrator/graph.py
+
 import uuid
+from datetime import datetime, timezone
 from fastapi import HTTPException
 
 from app.models.domain import Panel
@@ -46,6 +48,8 @@ async def run_pipeline(file_bytes: bytes, mime: str, user_id: str | None = None)
         ocr_used=ing["ocr_used"],
         raw_text=ing["text"],
         panels=panels,
+        uploaded_at_iso=datetime.now(timezone.utc).isoformat()
+        
     )
 
     # 6) Return minimal state to caller (UI can fetch /cases/{id}/cleaned later)
