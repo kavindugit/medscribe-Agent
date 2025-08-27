@@ -9,6 +9,7 @@ from app.orchestrator.state import PipelineState
 from app.tools.ingest_pdf import ingest
 from app.tools.validate_doc import is_medical_report
 from app.tools.clean_normalize import parse_text_to_panels
+from app.tools.report_classifier import infer_report_meta   # <-- NEW
 from app.storage.cases import save_case
 from app.normalizer import run_normalizer  # ✅ fix typo: was run_noramlizer
 from app.storage import put_json            # ✅ writes storage/cases/<id>/cleaned.json
@@ -39,6 +40,8 @@ async def run_pipeline(file_bytes: bytes, mime: str, user_id: str | None = None)
     # 4) Lightweight parsing to panels (your existing heuristic)
     panels: list[Panel] = parse_text_to_panels(ing["text"])
 
+    report_name, hospital, doctor = infer_report_meta(ing["text"])
+    
     # 5) Persist core artifacts (meta, raw_text, panels)
     save_case(
         case_id=case_id,
@@ -48,6 +51,9 @@ async def run_pipeline(file_bytes: bytes, mime: str, user_id: str | None = None)
         ocr_used=ing["ocr_used"],
         raw_text=ing["text"],
         panels=panels,
+        report_name=report_name,
+        hospital=hospital,
+        doctor=doctor,
         uploaded_at_iso=datetime.now(timezone.utc).isoformat()
         
     )
@@ -58,4 +64,7 @@ async def run_pipeline(file_bytes: bytes, mime: str, user_id: str | None = None)
         "panels": panels,
         "pages": ing["pages"],
         "ocr_used": ing["ocr_used"],
+        "report_name": report_name,
+        "hospital": hospital,
+        "doctor": doctor,
     }

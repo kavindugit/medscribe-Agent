@@ -43,9 +43,10 @@ def save_case(
     ocr_used: bool,
     raw_text: str,
     panels: List[Panel] | List[Dict[str, Any]],
-    uploaded_at_iso: Optional[str] = None,      # ⬅️ new (ISO8601)
-    original_filename: Optional[str] = None,    # ⬅️ new
-    file_size_bytes: Optional[int] = None,      # ⬅️ optional
+    report_name: Optional[str] = None,
+    hospital: Optional[str] = None,
+    doctor: Optional[str] = None,
+    uploaded_at_iso: Optional[str] = None, 
 ) -> None:
     """
     Persist a case. `uploaded_at_iso` defaults to current UTC time if not provided.
