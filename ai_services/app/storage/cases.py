@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, List, Dict
-from app.models.domain import Panel  # if you store panels as Pydantic objects
+from typing import Any, List, Dict, Optional
+from datetime import datetime, timezone   # ⬅️ add
+from app.models.domain import Panel
 
 ROOT = Path("storage") / "cases"
 
@@ -15,8 +16,6 @@ def _ensure_case_dir(case_id: str) -> Path:
     d = _case_dir(case_id)
     d.mkdir(parents=True, exist_ok=True)
     return d
-
-# ---------- JSON helpers (used by routes and graph) ----------
 
 def put_json(case_id: str, filename: str, data: Any) -> None:
     d = _ensure_case_dir(case_id)
@@ -44,7 +43,13 @@ def save_case(
     ocr_used: bool,
     raw_text: str,
     panels: List[Panel] | List[Dict[str, Any]],
+    uploaded_at_iso: Optional[str] = None,      # ⬅️ new (ISO8601)
+    original_filename: Optional[str] = None,    # ⬅️ new
+    file_size_bytes: Optional[int] = None,      # ⬅️ optional
 ) -> None:
+    """
+    Persist a case. `uploaded_at_iso` defaults to current UTC time if not provided.
+    """
     d = _ensure_case_dir(case_id)
 
     meta = {
@@ -53,6 +58,8 @@ def save_case(
         "mime": mime,
         "pages": pages,
         "ocr_used": ocr_used,
+        "uploaded_at": uploaded_at_iso or datetime.now(timezone.utc).isoformat()  
+                                        
     }
     (d / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
@@ -64,7 +71,9 @@ def save_case(
             serializable.append(p.model_dump())
         else:
             serializable.append(p)
-    (d / "panels.json").write_text(json.dumps(serializable, indent=2, ensure_ascii=False), encoding="utf-8")
+    (d / "panels.json").write_text(
+        json.dumps(serializable, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
 
 def load_meta(case_id: str) -> Dict[str, Any]:
     p = _case_dir(case_id) / "meta.json"
@@ -79,9 +88,6 @@ def load_panels(case_id: str) -> Any:
     return json.loads(p.read_text(encoding="utf-8"))
 
 def list_cases_for_user(user_id: str) -> List[str]:
-    """
-    Scan storage/cases/*/meta.json and return case_ids owned by user_id.
-    """
     out: List[str] = []
     for case_dir in ROOT.glob("*"):
         if not case_dir.is_dir():
