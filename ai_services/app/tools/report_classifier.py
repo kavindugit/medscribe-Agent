@@ -20,6 +20,10 @@ _REPORT_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"\b(mri|magnetic\s+resonance)\b", re.I), "MRI"),
     (re.compile(r"\b(ultrasound|sonography|usg)\b", re.I), "Ultrasound"),
     (re.compile(r"\b(echo(cardiogram)?|echocardiography)\b", re.I), "Echocardiogram"),
+    (re.compile(r"\b(outpatient\s+encounter|consultation\s+note|progress\s+note)\b", re.I), "Outpatient Encounter Note"),
+    (re.compile(r"\b(discharge\s+summary)\b", re.I), "Discharge Summary"),
+    (re.compile(r"\b(admission\s+note)\b", re.I), "Admission Note"),
+
 ]
 
 _HOSPITAL_HINTS = re.compile(
@@ -36,12 +40,27 @@ def _first_k_lines(text: str, k: int = 40) -> str:
     return "\n".join(lines[:k])
 
 def _extract_hospital(header: str) -> Optional[str]:
-    candidates = []
-    for ln in header.splitlines():
-        if _HOSPITAL_HINTS.search(ln) and 3 <= len(ln) <= 80:
-            clean = re.sub(r"[|•◦·\-–—]+\s*\S+$", "", ln).strip()
-            candidates.append(clean)
-    return min(candidates, key=len) if candidates else None
+    lines = [ln.strip() for ln in header.splitlines() if ln.strip()]
+    for i, ln in enumerate(lines):
+        if _HOSPITAL_HINTS.search(ln):
+            # case 1: "City Health Lab" directly in the line
+            # try to take the part after colon if present
+            after_colon = ln.split(":", 1)[1].strip() if ":" in ln else ""
+            if after_colon and len(after_colon) > 2:
+                return after_colon
+
+            # case 2: the label is "Laboratory:" or "Hospital:" → look at previous line
+            if ln.endswith(":") and i > 0:
+                prev = lines[i - 1].strip().strip(":")
+                if 3 <= len(prev) <= 80:
+                    return prev
+
+            # fallback: return the shortest plausible phrase on the line
+            cleaned = re.sub(r"[|•◦·\-–—]+\s*\S+$", "", ln).strip().strip(":")
+            if 3 <= len(cleaned) <= 80:
+                return cleaned
+    return None
+
 
 def _extract_doctor(header: str) -> Optional[str]:
     m = _DOCTOR_HINTS.search(header)
@@ -96,11 +115,12 @@ def classify_by_llm(header: str) -> Optional[str]:
         model = genai.GenerativeModel(model_name)
         prompt = (
             "You are a strict medical report classifier. "
-            "From the snippet below, output ONLY a short report type label "
-            '(e.g., "Complete Blood Count", "Liver Function Test", "MRI", "CT Scan", '
-            '"Ultrasound", "Radiology Report", "Urinalysis"). '
-            "If uncertain, output exactly: Unknown Report.\n\n"
-            f"Snippet:\n{_safe_header_summary(header)}"
+    "From the snippet below, output ONLY a concise report type label "
+    '(e.g., "Complete Blood Count", "Liver Function Test", "MRI", "CT Scan", '
+    '"Ultrasound", "Radiology Report", "Urinalysis"). '
+    "Do NOT answer with generic words like 'Test' or 'Tests'. "
+    "If uncertain, output exactly: Unknown Report.\n\n"
+    f"Snippet:\n{_safe_header_summary(header)}"
         )
         resp = model.generate_content(
             prompt,
@@ -139,9 +159,28 @@ def infer_report_meta(raw_text: str) -> tuple[str, str, str]:
         )
         report_name = title_like.strip()[:64] if title_like else "Unknown Report"
 
+    report_name = _clean_report_name(report_name)
     hospital = _extract_hospital(header) or "Unknown"
     doctor = _extract_doctor(header) or "Unknown"
 
     # normalize spacing
     norm = lambda s: re.sub(r"\s{2,}", " ", s or "").strip()
     return (norm(report_name), norm(hospital), norm(doctor))
+
+def _clean_report_name(name: str) -> str:
+    n = (name or "").strip().strip(":").strip()
+    # common throwaways
+    bad = {"test", "tests", "report", "medical report", "laboratory report"}
+    if not n:
+        return "Unknown Report"
+    if n.lower() in bad:
+        return "Unknown Report"
+    # too short/too long sanity
+    if len(n) < 3:
+        return "Unknown Report"
+    if len(n) > 64:
+        n = n[:64]
+    # Title case but keep ALL-CAPS acronyms (simple heuristic)
+    if n.isupper() and len(n) <= 10:
+        return n
+    return n.title()

@@ -59,7 +59,10 @@ def save_case(
         "mime": mime,
         "pages": pages,
         "ocr_used": ocr_used,
-        "uploaded_at": uploaded_at_iso or datetime.now(timezone.utc).isoformat()  
+        "uploaded_at": uploaded_at_iso or datetime.now(timezone.utc).isoformat(),
+        "report_name": report_name or "Unknown Report",
+        "hospital": hospital or "Unknown",
+        "doctor": doctor or "Unknown",
                                         
     }
     (d / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
