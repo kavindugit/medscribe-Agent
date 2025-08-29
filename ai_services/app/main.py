@@ -7,7 +7,7 @@ from app.routes.users import router as users_router
 
 from app.routes.classifier import router as classifier_router
 from app.routes.translator import router as translator_router
-
+from app.chatbot.routes.chat import router as chatbot_router
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -23,6 +23,9 @@ app.include_router(chat_router)
 app.include_router(users_router)
 app.include_router(classifier_router)
 app.include_router(translator_router)
+app.include_router(chatbot_router)
+
+
 
 
 

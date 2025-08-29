@@ -7,6 +7,7 @@ import authRouter from "./routes/authRoutes.js";
 import userRouter from "./routes/userRouter.js";
 import casesRouter from "./routes/casesRoutes.js";
 import indexRouter from "./routes/indexRoutes.js";
+import chatbotRouter from "./routes/chatbotRoutes.js";
 
 
 const app = express();
@@ -22,6 +23,8 @@ app.use('/api/auth',authRouter );
 app.use('/api/user',userRouter);
 app.use('/api/cases', casesRouter);
 app.use('/api/index', indexRouter);
+app.use('/api/chatbot', chatbotRouter);
+
 
 
 app.listen(PORT,()=> console.log(`Server is running on port ${PORT}`));
