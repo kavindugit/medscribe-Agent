@@ -1,6 +1,7 @@
 # app/orchestrator/graph.py
 
 import uuid
+import json
 from datetime import datetime, timezone
 from fastapi import HTTPException
 
@@ -9,10 +10,10 @@ from app.orchestrator.state import PipelineState
 from app.tools.ingest_pdf import ingest
 from app.tools.validate_doc import is_medical_report
 from app.tools.clean_normalize import parse_text_to_panels
-from app.tools.report_classifier import infer_report_meta   # <-- NEW
-from app.storage.cases import save_case
-from app.normalizer import run_normalizer  # ✅ fix typo: was run_noramlizer
-from app.storage import put_json            # ✅ writes storage/cases/<id>/cleaned.json
+from app.tools.report_classifier import infer_report_meta
+from app.normalizer import run_normalizer
+from app.storage.cases_mongo import save_case_mongo
+from app.storage.azure_client import upload_file   # ✅ use Azure uploader
 
 
 async def run_pipeline(file_bytes: bytes, mime: str, user_id: str | None = None) -> PipelineState:
@@ -32,33 +33,63 @@ async def run_pipeline(file_bytes: bytes, mime: str, user_id: str | None = None)
             },
         )
 
-    # 3) Deterministic normalization (faithful cleanup; no LLM)
+    # 3) Deterministic normalization
     cleaned_payload = run_normalizer(ing["text"], {"mime": mime})
-    # persist cleaned.json for RAG/teammates
-    put_json(case_id, "cleaned.json", cleaned_payload.model_dump())
 
-    # 4) Lightweight parsing to panels (your existing heuristic)
+    # 4) Parse panels
     panels: list[Panel] = parse_text_to_panels(ing["text"])
 
-    report_name, hospital, doctor = infer_report_meta(ing["text"])
-    
-    # 5) Persist core artifacts (meta, raw_text, panels)
-    save_case(
-        case_id=case_id,
-        user_id=user_id or "anon",
-        mime=mime,
-        pages=ing["pages"],
-        ocr_used=ing["ocr_used"],
-        raw_text=ing["text"],
-        panels=panels,
-        report_name=report_name,
-        hospital=hospital,
-        doctor=doctor,
-        uploaded_at_iso=datetime.now(timezone.utc).isoformat()
-        
-    )
+    # Flatten panels into test lines for enrichment
+    lab_lines = []
+    for panel in panels:
+        for item in panel.items:
+            ref = f" (ref {item.ref_text})" if item.ref_text else ""
+            flag = f" [{item.flag}]" if item.flag else ""
+            lab_lines.append(f"- {item.name}: {item.result} {item.unit or ''}{ref}{flag}")
 
-    # 6) Return minimal state to caller (UI can fetch /cases/{id}/cleaned later)
+    if lab_lines:
+        sections = cleaned_payload.sections.copy()
+        sections["tests"] = "\n".join(lab_lines)
+        cleaned_payload = cleaned_payload.copy(update={"sections": sections, "version": 2})
+
+    # -----------------------------
+    # 5) Upload files to Azure Blob
+    # -----------------------------
+
+    # Raw text
+    raw_path = f"cases/{case_id}/raw.txt"
+    upload_file(raw_path, ing["text"].encode("utf-8"), content_type="text/plain")
+
+    # Cleaned JSON
+    cleaned_path = f"cases/{case_id}/cleaned.json"
+    cleaned_bytes = cleaned_payload.model_dump_json(indent=2).encode("utf-8")
+    upload_file(cleaned_path, cleaned_bytes, content_type="application/json")
+
+    # Panels JSON
+    panels_path = f"cases/{case_id}/panels.json"
+    panels_bytes = json.dumps([p.model_dump() for p in panels], indent=2).encode("utf-8")
+    upload_file(panels_path, panels_bytes, content_type="application/json")
+
+    # -----------------------------
+    # 6) Save metadata to MongoDB
+    # -----------------------------
+    report_name, hospital, doctor = infer_report_meta(ing["text"])
+
+    save_case_mongo({
+        "_id": case_id,
+        "user_id": user_id or "anon",
+        "report_name": report_name,
+        "hospital": hospital,
+        "doctor": doctor,
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "raw_text_path": raw_path,
+        "cleaned_path": cleaned_path,
+        "panels_path": panels_path
+    })
+
+    # -----------------------------
+    # 7) Return minimal state
+    # -----------------------------
     return {
         "case_id": case_id,
         "panels": panels,
