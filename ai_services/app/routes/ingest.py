@@ -4,7 +4,7 @@ from fastapi import APIRouter, UploadFile, HTTPException, Header, BackgroundTask
 
 from app.orchestrator.graph import run_pipeline
 from app.models.io import ProcessResponse, IngestStats
-from app.embeddings.build_index import build_index_background
+from app.vector.indexer import index_case   # ✅ corrected
 
 router = APIRouter(prefix="/ingest", tags=["process"])
 
@@ -19,15 +19,15 @@ async def process(
 
     binary = await file.read()
 
-    # Your pipeline handles: ingest → validate → normalize → save raw/panels/cleaned.json
+    # 🚀 Pipeline handles: ingest → validate → normalize → save → Azure Blob → Mongo
     state = await run_pipeline(binary, file.content_type, user_id=x_user_id)
 
-    # 🔔 Immediately schedule embeddings build (HF Inference API) in the background
-    background_tasks.add_task(build_index_background, state["case_id"])
+    # 🧩 Schedule background indexing into Qdrant
+    background_tasks.add_task(index_case, state["case_id"])
 
     return ProcessResponse(
         case_id=state["case_id"],
         panels=state["panels"],
         ingest_stats=IngestStats(pages=state["pages"], ocr_used=state["ocr_used"]),
-        message="Processed and saved. (Index build scheduled)",
+        message="Processed, saved to Azure+Mongo, indexing scheduled in Qdrant.",
     )
