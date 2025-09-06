@@ -15,3 +15,6 @@ def get_users_collection():
 
 def get_cases_collection():
     return db["cases"]
+
+def get_conversations_collection():   # ✅ new
+    return db["conversations"]
