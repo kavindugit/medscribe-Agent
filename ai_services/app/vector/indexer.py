@@ -24,15 +24,42 @@ encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 # Ensure collection exists
 # -----------------------------
 def ensure_collection():
-    """Create collection if it does not exist."""
+    """Create collection with vector config + payload indexes if not exists."""
     try:
         qdrant.get_collection(COLLECTION)
+        return
     except Exception:
-        qdrant.recreate_collection(
-            collection_name=COLLECTION,
-            vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
-        )
-        print(f"✅ Created Qdrant collection: {COLLECTION}")
+        pass
+
+    # Create vector collection
+    qdrant.recreate_collection(
+        collection_name=COLLECTION,
+        vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE),
+    )
+
+    # Add payload indexes (for filtering/search)
+    qdrant.create_payload_index(
+        collection_name=COLLECTION,
+        field_name="case_id",
+        field_schema="keyword",
+    )
+    qdrant.create_payload_index(
+        collection_name=COLLECTION,
+        field_name="report_name",
+        field_schema="keyword",
+    )
+    qdrant.create_payload_index(
+        collection_name=COLLECTION,
+        field_name="doctor",
+        field_schema="keyword",
+    )
+    qdrant.create_payload_index(
+        collection_name=COLLECTION,
+        field_name="hospital",
+        field_schema="keyword",
+    )
+
+    print(f"✅ Created Qdrant collection with indexes: {COLLECTION}")
 
 # -----------------------------
 # Index a case into Qdrant
@@ -90,21 +117,21 @@ def index_case(case_id: str) -> int:
     embeddings = encoder.encode(chunks, show_progress_bar=False).tolist()
 
     # --- upsert into Qdrant ---
-    points = []
-    for i, (text, vector) in enumerate(zip(chunks, embeddings)):
-        points.append(
-            models.PointStruct(
-                id=i,  # ✅ use integer ID (fixes Qdrant error)
-                vector=vector,
-                payload={
-                    "case_id": case_id,
-                    "chunk": text,
-                    "report_name": case.get("report_name"),
-                    "doctor": case.get("doctor"),
-                    "hospital": case.get("hospital"),
-                },
-            )
+    points = [
+        models.PointStruct(
+            id=i,  # ✅ integer ID (safe for Qdrant)
+            vector=vector,
+            payload={
+                "case_id": case_id,
+                "user_id": case.get("user_id"),
+                "chunk": text,
+                "report_name": case.get("report_name"),
+                "doctor": case.get("doctor"),
+                "hospital": case.get("hospital"),
+            },
         )
+        for i, (text, vector) in enumerate(zip(chunks, embeddings))
+    ]
 
     qdrant.upsert(collection_name=COLLECTION, points=points)
     print(f"✅ Indexed {len(points)} chunks into Qdrant for case {case_id}")

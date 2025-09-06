@@ -1,38 +1,50 @@
-from fastapi import APIRouter, HTTPException
+# app/chatbot/routes/chat.py
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
-from app.chatbot.orchestrator import build_chatbot_graph
+from typing import Optional, List, Dict, Any
 
-# Initialize router with prefix
-router = APIRouter(prefix="/chatbot")
+from app.vector.retriever import retrieve_chunks   # ✅ fixed import
 
-# Initialize chatbot workflow once
-chatbot_graph = build_chatbot_graph()
+router = APIRouter(prefix="/chat", tags=["chatbot"])
 
-# Request schema
-class ChatRequest(BaseModel):
-    user_id: str
-    message: str
+# -----------------------------
+# Request / Response Models
+# -----------------------------
+class ChatQuery(BaseModel):
+    query: str
+    case_id: Optional[str] = None   # restrict search to a case
+    top_k: int = 5
 
-# Response schema
+
 class ChatResponse(BaseModel):
-    response: str
+    case_id: Optional[str]
+    query: str
+    results: List[Dict[str, Any]]
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest):
+
+# -----------------------------
+# Endpoints
+# -----------------------------
+@router.post("/query")
+async def query_chat(
+    payload: ChatQuery,
+    x_user_id: Optional[str] = Header(default=None, alias="X-User-Id")
+):
+    if not x_user_id:
+        raise HTTPException(status_code=400, detail="X-User-Id header is required")
+
     try:
-        # Initial state for LangGraph
-        initial_state = {
-            "user_id": request.user_id,
-            "query": request.message
-        }
-
-        # Run graph
-        result = chatbot_graph.invoke(initial_state)
-
-        # Extract response from state
-        response = result.get("response", "Sorry, I could not process that request.")
-
-        return ChatResponse(response=response)
-
+        retrieved = retrieve_chunks(
+            query=payload.query,
+            case_id=payload.case_id,
+            user_id=x_user_id,
+            top_k=payload.top_k
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Retriever error: {str(e)}")
+
+    return {
+        "query": payload.query,
+        "meta": retrieved["meta"],      # ✅ report metadata once
+        "results": retrieved["results"] # ✅ only chunks + scores
+    }
