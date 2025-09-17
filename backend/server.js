@@ -7,9 +7,8 @@ import authRouter from "./routes/authRoutes.js";
 import userRouter from "./routes/userRouter.js";
 import casesRouter from "./routes/casesRoutes.js";
 import indexRouter from "./routes/indexRoutes.js";
-import chatbotRouter from "./routes/chatbotRoutes.js";
-
-
+import conversationsRouter from "./routes/coversationRoutes.js";
+import chatRouter from "./routes/chatRoutes.js";
 const app = express();
 const PORT = process.env.PORT || 4000;
 connectDB();
@@ -23,9 +22,8 @@ app.use('/api/auth',authRouter );
 app.use('/api/user',userRouter);
 app.use('/api/cases', casesRouter);
 app.use('/api/index', indexRouter);
-app.use('/api/chatbot', chatbotRouter);
-
-
+app.use('/api/conversations', conversationsRouter);
+app.use('/api', chatRouter);
 
 app.listen(PORT,()=> console.log(`Server is running on port ${PORT}`));
 
