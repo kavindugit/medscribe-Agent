@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useContext, useState } from "react";
-import { AppContent } from "@/context/AppContext"; // your context
+import { AppContent } from "../context/AppContent";
 
 export default function Uploader() {
   const { backendUrl, userData } = useContext(AppContent);
