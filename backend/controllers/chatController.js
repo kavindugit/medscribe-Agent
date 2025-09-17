@@ -12,7 +12,10 @@ export const ragChat = async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
 
+<<<<<<< HEAD
     // Forward body (query + optional top_k, no need for case_id)
+=======
+>>>>>>> 5a8c52b4d2c24613db78fd5913fc1cee705711e9
     const r = await ai.post("/rag/chat", req.body, {
       headers: {
         "X-User-Id": userId,

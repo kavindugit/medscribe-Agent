@@ -1,4 +1,3 @@
-# app/chatbot/routes/rag_chat.py
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
@@ -7,13 +6,12 @@ import uuid
 
 from app.chatbot.rag_agent import rag_answer
 from app.storage.conversations_mongo import save_conversation
-from app.storage.cases_mongo import get_latest_case   # ✅ use latest case lookup
 
 router = APIRouter(prefix="/rag", tags=["chatbot-rag"])
 
 class RAGQuery(BaseModel):
     query: str
-    case_id: Optional[str] = None   # still optional (but auto-filled if missing)
+    case_id: Optional[str] = None
     top_k: int = 5
 
 class RAGResponse(BaseModel):
@@ -30,21 +28,13 @@ async def rag_chat(
         raise HTTPException(status_code=400, detail="X-User-Id header is required")
 
     try:
-        # ✅ Try RAG with latest report
+        # 🔥 Call rag_answer directly with all required args
         answer = rag_answer(
             user_id=x_user_id,
             query=payload.query,
             case_id=payload.case_id,
             top_k=payload.top_k,
         )
-
-        if "⚠️" in answer or "no medical reports" in answer.lower():
-            # ⚠️ No reports found → graceful fallback
-            answer = (
-                "I don’t see any medical reports uploaded for your account yet. "
-                "Please upload a report so I can summarize it. "
-                "Meanwhile, feel free to ask me general health questions. "
-            )
 
         # Save conversation turn
         save_conversation({
@@ -63,12 +53,4 @@ async def rag_chat(
         }
 
     except Exception as e:
-        # 🚨 Catch-all fallback
-        return {
-            "query": payload.query,
-            "answer": (
-                "I'm here to help! I couldn't access your reports right now, "
-                "but you can still ask me general medical questions."
-            ),
-            "meta": {"case_id": None, "user_id": x_user_id},
-        }
+        raise HTTPException(status_code=500, detail=f"RAG error: {str(e)}")
