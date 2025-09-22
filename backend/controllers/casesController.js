@@ -2,13 +2,17 @@
 import FormData from "form-data";
 import { ai } from "../lib/aiClient.js";
 
-const getUserIdFromReq = (req) =>
-  (req.user?.id?.toString()) || req.get("X-User-Id") || "anon";
 
-/**
- * POST /api/cases
- * Forwards the uploaded file to FastAPI /ingest/process
- */
+const getUserIdFromReq = (req) => {
+  const userId =
+    req.userId || // from your auth middleware
+    (req.user && req.user.id) || // if middleware sets req.user
+    req.get("X-User-Id") || // if manually passed in header
+    "anon"; // fallback
+  return String(userId);
+};
+
+
 export const createCase = async (req, res) => {
   try {
     if (!req.file) {
@@ -42,9 +46,6 @@ export const createCase = async (req, res) => {
   }
 };
 
-/**
- * GET /api/cases/:id/raw  -> FastAPI /cases/{id}/raw
- */
 export const getCaseRaw = async (req, res) => {
   const { id } = req.params;
   const userId = getUserIdFromReq(req);
@@ -61,9 +62,6 @@ export const getCaseRaw = async (req, res) => {
   }
 };
 
-/**
- * GET /api/cases/:id/data -> FastAPI /cases/{id}/data
- */
 export const getCaseData = async (req, res) => {
   const { id } = req.params;
   const userId = getUserIdFromReq(req);
@@ -80,9 +78,6 @@ export const getCaseData = async (req, res) => {
   }
 };
 
-/**
- * GET /api/cases/:id/meta -> FastAPI /cases/{id}/meta
- */
 export const getCaseMeta = async (req, res) => {
   const { id } = req.params;
   const userId = getUserIdFromReq(req);
@@ -99,9 +94,7 @@ export const getCaseMeta = async (req, res) => {
   }
 };
 
-/**
- * GET /api/cases/:id/export -> FastAPI /cases/{id}/export
- */
+
 export const exportCase = async (req, res) => {
   const { id } = req.params;
   const userId = getUserIdFromReq(req);
@@ -118,14 +111,11 @@ export const exportCase = async (req, res) => {
   }
 };
 
-/**
- * GET /api/cases/:id/cleaned -> FastAPI /cases/{id}/cleaned
- */
 export const getCleaned = async (req, res) => {
   const { id } = req.params;
   const userId = getUserIdFromReq(req);
   try {
-    const r = await ai.get(`/cases/${id}/cleaned`, {
+    const r = await ai.get(`/cases/${id}/file/cleaned`, {
       headers: { "X-User-Id": userId },
       validateStatus: () => true,
     });

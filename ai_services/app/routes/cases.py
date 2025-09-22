@@ -8,17 +8,22 @@ from app.storage.azure_client import get_sas_url
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
-# -------------------------
-# Ownership helper
-# -------------------------
+
+
+from fastapi import HTTPException
+from typing import Optional
+
 def _require_owner(x_user_id: Optional[str], meta_user_id: str) -> None:
-    if meta_user_id and x_user_id and x_user_id != meta_user_id:
-        raise HTTPException(status_code=403, detail="Forbidden: case not owned by user")
+    if meta_user_id and x_user_id and str(x_user_id) != str(meta_user_id):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Forbidden: case not owned by user",
+                "x_user_id": str(x_user_id),
+                "meta_user_id": str(meta_user_id),
+            },
+        )
 
-
-# -------------------------
-# Endpoints
-# -------------------------
 
 @router.get("/{case_id}/meta")
 def get_meta(case_id: str, x_user_id: Optional[str] = Header(default=None, alias="X-User-Id")):
@@ -37,7 +42,7 @@ def get_meta(case_id: str, x_user_id: Optional[str] = Header(default=None, alias
 @router.get("/{case_id}/file/{file_type}")
 async def get_case_file(case_id: str, file_type: str, x_user_id: Optional[str] = Header(default=None, alias="X-User-Id")):
     """
-    Return a short-lived SAS URL for case files: raw_text, cleaned, or panels.
+    Return a SAS URL for case files: raw_text, cleaned, or panels.
     """
     cases = get_cases_collection()
     case = cases.find_one({"_id": case_id})
@@ -59,8 +64,10 @@ async def get_case_file(case_id: str, file_type: str, x_user_id: Optional[str] =
     if not blob_path:
         raise HTTPException(status_code=404, detail=f"{file_type} file not found")
 
-    sas_url = get_sas_url(blob_path, expiry_minutes=5)  # short-lived URL
-    return {"sas_url": sas_url}
+    sas_url = get_sas_url(blob_path)  # ✅ no expiry_minutes
+    return {"sas_url": sas_url,
+            "blob_path": blob_path
+            }
 
 
 @router.get("/{case_id}/export")
@@ -78,9 +85,9 @@ async def export_case(case_id: str, x_user_id: Optional[str] = Header(default=No
     response = {
         "meta": case,
         "files": {
-            "raw_text": get_sas_url(case["raw_text_path"], expiry_minutes=5),
-            "cleaned": get_sas_url(case["cleaned_path"], expiry_minutes=5),
-            "panels": get_sas_url(case["panels_path"], expiry_minutes=5),
+            "raw_text": get_sas_url(case["raw_text_path"]),
+            "cleaned": get_sas_url(case["cleaned_path"]),
+            "panels": get_sas_url(case["panels_path"]),
         },
     }
     return response

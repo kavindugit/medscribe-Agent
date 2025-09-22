@@ -1,13 +1,14 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import json
+import os
 from app.vector.retriever import retrieve_chunks
 from app.storage.azure_client import container_client
 from app.storage.mongo_client import get_cases_collection
 from app.storage.conversations_mongo import get_conversation_history
+from app.chatbot.utils.case_resolver import resolve_case
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
-import os
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
@@ -16,7 +17,6 @@ llm = ChatGoogleGenerativeAI(
     api_key=GOOGLE_API_KEY,
     temperature=0.2,
 )
-
 
 def _load_json_from_blob(blob_path: str) -> Dict[str, Any]:
     try:
@@ -27,44 +27,54 @@ def _load_json_from_blob(blob_path: str) -> Dict[str, Any]:
         print(f"⚠️ Failed to load {blob_path}: {e}")
         return {}
 
-
-def rag_answer(user_id: str, query: str, case_id: str, top_k: int = 5, history_turns: int = 3) -> str:
+def rag_answer(
+    user_id: str,
+    query: str,
+    case_id: str | None,
+    top_k: int = 5,
+    history_turns: int = 3
+) -> Tuple[str, Dict[str, Any], List[str]]:
     """
     Multi-turn RAG:
-    - Retrieve relevant chunks from Qdrant
+    - Resolve which case(s) to use
+    - Retrieve chunks from Qdrant
     - Load structured panels + cleaned JSON
     - Append last N conversation turns as chat history
+    Returns: (answer, memory_used, case_ids)
     """
 
-    # 1️⃣ Retrieve semantic context
-    retrieved = retrieve_chunks(query=query, case_id=case_id, user_id=user_id, top_k=top_k)
-    chunks = [r["chunk"] for r in retrieved.get("results", [])]
+    # 1️⃣ Resolve cases (auto if case_id not given)
+    case_ids = resolve_case(user_id, query, case_id)
 
-    # 2️⃣ Load structured files
+    # 2️⃣ Retrieve semantic context
+    chunks = []
+    for cid in case_ids:
+        retrieved = retrieve_chunks(query=query, case_id=cid, user_id=user_id, top_k=top_k)
+        chunks.extend([r["chunk"] for r in retrieved.get("results", [])])
+
+    # 3️⃣ Load structured files
     cases = get_cases_collection()
-    case = cases.find_one({"_id": case_id})
     panels, cleaned = {}, {}
-    if case:
-        if "panels_path" in case:
-            panels = _load_json_from_blob(case["panels_path"])
-        if "cleaned_path" in case:
-            cleaned = _load_json_from_blob(case["cleaned_path"])
+    for cid in case_ids:
+        case = cases.find_one({"_id": cid})
+        if case:
+            if "panels_path" in case:
+                panels[cid] = _load_json_from_blob(case["panels_path"])
+            if "cleaned_path" in case:
+                cleaned[cid] = _load_json_from_blob(case["cleaned_path"])
 
-    # 3️⃣ Load previous conversation turns (last N)
-    history = get_conversation_history(user_id, case_id)
+    # 4️⃣ Load conversation history
+    history = get_conversation_history(user_id, case_ids[0] if case_ids else None)
     if history_turns > 0:
         history = history[-history_turns:]
-    else:
-        history = []
-
     formatted_history = "\n".join(
         [f"User: {h['query']}\nAssistant: {h['answer']}" for h in history]
     ) or "No prior conversation."
 
-    # 4️⃣ Build final prompt
+    # 5️⃣ Build prompt
     prompt_template = ChatPromptTemplate.from_messages([
         ("system",
-         "You are a medical assistant. Always ground answers in the provided medical report. "
+         "You are a medical assistant. Always ground answers in the provided medical reports. "
          "If data is missing, say you don’t know. Answer in a safe, patient-friendly way. "
          "Never make up lab values or diagnoses."),
         ("human",
@@ -81,12 +91,12 @@ def rag_answer(user_id: str, query: str, case_id: str, top_k: int = 5, history_t
         query=query,
         chunks="\n".join(chunks) if chunks else "No semantic matches.",
         panels=json.dumps(panels, indent=2) if panels else "No panels available.",
-        cleaned=json.dumps(cleaned.get("sections", {}), indent=2) if cleaned else "No cleaned data available.",
+        cleaned=json.dumps(cleaned, indent=2) if cleaned else "No cleaned data available.",
     )
 
-    # 5️⃣ Call LLM
+    # 6️⃣ Call LLM
     try:
         response = llm.invoke(formatted_prompt)
-        return response.content
+        return response.content, {"short_term": [formatted_history], "long_term": []}, case_ids
     except Exception as e:
-        return f"⚠️ RAG error: {e}"
+        return f"⚠️ RAG error: {e}", {}, case_ids
