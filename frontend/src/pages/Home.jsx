@@ -9,6 +9,7 @@ export default function HomePage() {
 
   const [file, setFile] = useState(null);
   const [caseId, setCaseId] = useState("");
+  const [error, setError] = useState("");
 
   // Upload handler
   const onUpload = async () => {
@@ -19,32 +20,16 @@ export default function HomePage() {
     form.append("file", file);
 
     try {
-      // 1) create case
       const { data } = await axios.post(`${backendUrl}/api/cases`, form, {
         withCredentials: true,
         headers: { "X-User-Id": userData.userId },
       });
       setCaseId(data.case_id);
-
-      // 2) fetch cleaned (no on-screen preview; just log)
-      const cleaned = await axios.get(
-        `${backendUrl}/api/cases/${data.case_id}/cleaned`,
-        {
-          withCredentials: true,
-          headers: { "X-User-Id": userData.userId },
-        }
-      );
-      console.log("cleaned:", cleaned.data); // e.g., cleaned.sections.labs_block
+      setError("");
     } catch (err) {
       console.error(err?.response?.data || err.message);
-      alert("Upload failed");
+      setError("Upload failed. Please try again.");
     }
-  };
-
-  const user = {
-    name: "Maya Perera",
-    role: "Patient",
-    avatar: "https://i.pravatar.cc/120?img=12",
   };
 
   const stats = [
@@ -95,7 +80,9 @@ export default function HomePage() {
               <h1 className="text-xl font-semibold tracking-tight">
                 MedReport Assist
               </h1>
-              <p className="text-xs text-neutral-300">Private • Safe • Cited</p>
+              <p className="text-xs text-neutral-300">
+                Private • Safe • Cited
+              </p>
             </div>
           </div>
           <button
@@ -103,11 +90,13 @@ export default function HomePage() {
             className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:border-cyan-400"
           >
             <img
-              src={user.avatar}
+              src={userData?.avatar || "https://i.pravatar.cc/120?img=12"}
               alt="avatar"
               className="h-8 w-8 rounded-full"
             />
-            <span className="hidden sm:inline">{user.name}</span>
+            <span className="hidden sm:inline">
+              {userData?.name || "Guest"}
+            </span>
           </button>
         </header>
 
@@ -117,16 +106,16 @@ export default function HomePage() {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <img
-                  src={user.avatar}
+                  src={userData?.avatar || "https://i.pravatar.cc/120?img=12"}
                   alt="avatar"
                   className="h-14 w-14 rounded-full ring-2 ring-white/10"
                 />
                 <div>
                   <h2 className="text-2xl font-bold leading-tight">
-                    Welcome back, {user.name}
+                    Welcome back, {userData?.name || "Guest"}
                   </h2>
                   <p className="text-sm text-neutral-300">
-                    Your reports at a glance • {user.role}
+                    Your reports at a glance • {userData?.role || "Patient"}
                   </p>
                 </div>
               </div>
@@ -162,12 +151,15 @@ export default function HomePage() {
                 >
                   Upload
                 </button>
+                {error && (
+                  <p className="text-sm text-red-400 font-medium">{error}</p>
+                )}
                 {caseId && (
                   <div className="mt-3 text-left">
-                    <p className="text-xs text-neutral-300">
-                      Uploaded ✅ Case ID: {caseId}
+                    <p className="text-xs text-green-400 font-medium">
+                      ✅ Uploaded • Case ID:{" "}
+                      <span className="text-cyan-400">{caseId}</span>
                     </p>
-                    {/* Removed raw text preview as requested */}
                   </div>
                 )}
               </div>

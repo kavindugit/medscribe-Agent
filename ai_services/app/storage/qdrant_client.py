@@ -1,8 +1,9 @@
+# app/storage/qdrant_client.py
 import os
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_qdrant import Qdrant
+from langchain_community.vectorstores import Qdrant   # ✅ use community version
 
 # Load env vars
 QDRANT_URL = os.getenv("QDRANT_URL")
@@ -24,8 +25,20 @@ def get_or_create_collection(name: str):
     except Exception:
         qdrant_client.create_collection(
             collection_name=name,
-            vectors_config=VectorParams(size=384, distance=Distance.COSINE)  # 384 dims for MiniLM
+            vectors_config=VectorParams(size=384, distance=Distance.COSINE)
         )
+        # ✅ add payload indexes for filtering
+        qdrant_client.create_payload_index(
+            collection_name=name,
+            field_name="user_id",
+            field_schema="keyword"
+        )
+        qdrant_client.create_payload_index(
+            collection_name=name,
+            field_name="case_id",
+            field_schema="keyword"
+        )
+
 
 def get_qdrant_vectorstore(collection_name: str):
     """Return LangChain-compatible Qdrant vectorstore"""

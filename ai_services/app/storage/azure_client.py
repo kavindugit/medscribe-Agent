@@ -37,4 +37,4 @@ def get_sas_url(blob_path: str) -> str:
     """
     # ACCOUNT_URL already includes ?SAS_TOKEN if you configured like that
     base_url = ACCOUNT_URL.split("?")[0]  # ensure no duplicate
-    return f"{base_url}/{blob_path}?{SAS_TOKEN}"
+    return f"{base_url}/{CONTAINER}/{blob_path}?{SAS_TOKEN}"

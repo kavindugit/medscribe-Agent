@@ -1,3 +1,4 @@
+# app/orchestrator/state.py
 from typing import TypedDict, List
 from app.models.domain import Panel
 

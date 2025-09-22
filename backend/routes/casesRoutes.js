@@ -15,10 +15,10 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 
 const casesRouter = express.Router();
 casesRouter.post("/", upload.single("file"), createCase);
-casesRouter.get("/:id/raw", getCaseRaw);
-casesRouter.get("/:id/data", getCaseData);
-casesRouter.get("/:id/meta", getCaseMeta);
-casesRouter.get("/:id/export", exportCase);
+casesRouter.get("/:id/raw", userAuth , getCaseRaw);
+casesRouter.get("/:id/data", userAuth , getCaseData);
+casesRouter.get("/:id/meta", userAuth , getCaseMeta);
+casesRouter.get("/:id/export", userAuth , exportCase);
 casesRouter.get("/:id/cleaned", userAuth , getCleaned);
 
 export default casesRouter;
