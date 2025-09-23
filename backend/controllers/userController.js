@@ -1,3 +1,4 @@
+//backend/controllers/userController.js
 import userModel from '../models/usermodel.js';
 
 // Get a single user's data by userId

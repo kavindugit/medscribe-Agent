@@ -1,5 +1,6 @@
-// Save as src/pages/SignupPage.jsx (Tailwind CSS required)
-// This version wires the form to your backend API: http://localhost:4000/api/auth/register
+// Save as src/pages/SignupPage.jsx
+// Tailwind CSS required
+// Wires to backend: http://localhost:4000/api/auth/register
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -37,20 +38,23 @@ export default function SignupPage() {
     setError("");
     setSuccess("");
 
-    // Basic client-side checks (keep in sync with backend rules)
-    if (!/\S+@\S+\.\S+/.test(form.email)) return setError("Please enter a valid email address.");
+    if (!/\S+@\S+\.\S+/.test(form.email))
+      return setError("Please enter a valid email address.");
     if (!form.fullName || !form.nic || !form.phoneNo || !form.address || !form.gender || !form.dob)
       return setError("Please complete all required fields.");
-    if (form.password.length < 8) return setError("Password must be at least 8 characters.");
-    if (form.password !== form.confirmPassword) return setError("Passwords do not match.");
-    if (!form.agree) return setError("You must agree to the Terms and Privacy Policy.");
+    if (form.password.length < 8)
+      return setError("Password must be at least 8 characters.");
+    if (form.password !== form.confirmPassword)
+      return setError("Passwords do not match.");
+    if (!form.agree)
+      return setError("You must agree to the Terms and Privacy Policy.");
 
     setLoading(true);
     try {
       const res = await fetch("http://localhost:4000/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // IMPORTANT: so httpOnly cookie from backend is stored
+        credentials: "include",
         body: JSON.stringify({
           fullName: form.fullName,
           nic: form.nic,
@@ -58,7 +62,7 @@ export default function SignupPage() {
           phoneNo: form.phoneNo,
           address: form.address,
           gender: form.gender,
-          dob: form.dob, // YYYY-MM-DD from input[type=date]
+          dob: form.dob,
           password: form.password,
           role: "patient",
         }),
@@ -70,10 +74,8 @@ export default function SignupPage() {
         throw new Error(data?.message || `Registration failed (HTTP ${res.status}).`);
       }
 
-      setSuccess("Account created! You can now sign in.");
-
-      // Optional: auto-redirect after a short pause
-      setTimeout(() => navigate("/login"), 900);
+      setSuccess("✅ Account created! Redirecting to login…");
+      setTimeout(() => navigate("/login"), 1200);
     } catch (err) {
       setError(err.message || "Something went wrong. Try again.");
     } finally {
@@ -82,68 +84,70 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-neutral-950 text-white">
-      {/* Background visuals */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="absolute -top-24 -left-24 h-96 w-96 rounded-full blur-3xl opacity-40"
-          style={{ background: "radial-gradient(closest-side, #22d3ee, transparent)" }}
-        />
-        <div
-          className="absolute -bottom-24 -right-24 h-[28rem] w-[28rem] rounded-full blur-3xl opacity-40"
-          style={{ background: "radial-gradient(closest-side, #a78bfa, transparent)" }}
-        />
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/asfalt-light.png')] opacity-10" />
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-300/40 via-white/40 to-fuchsia-300/40" />
+    <div className="relative min-h-screen w-full bg-slate-950 text-white overflow-hidden">
+      {/* 🔥 Animated backdrop */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-40 -right-40 h-[38rem] w-[38rem] rounded-full blur-3xl bg-cyan-500/20 animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 h-[38rem] w-[38rem] rounded-full blur-3xl bg-emerald-500/20 animate-pulse" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-300/40 via-white/30 to-emerald-300/40" />
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col lg:grid lg:grid-cols-2">
-        {/* Left panel with brand/content (hidden on small screens) */}
+        {/* Left branding */}
         <section className="hidden lg:flex flex-col justify-between p-10">
           <header className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-fuchsia-500 text-black font-black">MR</div>
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-emerald-500 text-black font-black">
+              MR
+            </div>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">MedReport Assist</h1>
+              <h1 className="text-xl font-semibold tracking-tight">
+                MedReport Assist
+              </h1>
               <p className="text-sm text-neutral-300">Create your account</p>
             </div>
           </header>
 
           <div className="space-y-6">
             <h2 className="text-4xl font-extrabold leading-tight tracking-tight">
-              Join and manage your medical reports
-              <br /> with clarity and privacy.
+              Join MedReport Assist <br /> for clarity & privacy
             </h2>
             <ul className="space-y-3 text-neutral-300">
               <li className="flex items-start gap-3">
-                <span className="mt-1 inline-block h-2.5 w-2.5 rounded-full bg-cyan-400"></span>
-                Upload reports securely via encrypted storage.
+                <span className="mt-1 inline-block h-2.5 w-2.5 rounded-full bg-cyan-400" />
+                Upload reports securely with encrypted storage.
               </li>
               <li className="flex items-start gap-3">
-                <span className="mt-1 inline-block h-2.5 w-2.5 rounded-full bg-fuchsia-400"></span>
-                Summaries and term translations with citations.
+                <span className="mt-1 inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                Term translations & summaries with citations.
               </li>
               <li className="flex items-start gap-3">
-                <span className="mt-1 inline-block h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+                <span className="mt-1 inline-block h-2.5 w-2.5 rounded-full bg-fuchsia-400" />
                 You control access and retention policies.
               </li>
             </ul>
           </div>
 
-          <footer className="text-xs text-neutral-400">
-            © {new Date().getFullYear()} MedReport Assist • Educational support — not a medical diagnosis.
+          <footer className="text-xs text-neutral-500">
+            © {new Date().getFullYear()} MedReport Assist • Support tool — not a diagnosis.
           </footer>
         </section>
 
-        {/* Right: Signup card */}
+        {/* Right signup card */}
         <main className="flex items-center justify-center px-6 py-12">
           <div className="w-full max-w-2xl">
+            {/* Mobile header */}
             <div className="mb-8 text-center lg:hidden">
-              <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-fuchsia-500 text-black font-black">MR</div>
+              <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-emerald-500 text-black font-black">
+                MR
+              </div>
               <h2 className="text-2xl font-bold">Create your account</h2>
-              <p className="mt-1 text-sm text-neutral-300">Sign up to start managing reports</p>
+              <p className="mt-1 text-sm text-neutral-400">
+                Sign up to start managing reports
+              </p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-[0_0_40px_-15px_rgba(168,85,247,0.6)] backdrop-blur">
+            {/* Card */}
+            <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 shadow-[0_0_40px_-15px_rgba(34,211,238,0.6)] backdrop-blur">
               <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {error && (
                   <div className="md:col-span-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
@@ -156,6 +160,7 @@ export default function SignupPage() {
                   </div>
                 )}
 
+                {/* Full Name */}
                 <div>
                   <label className="block text-sm text-neutral-300">Full Name</label>
                   <input
@@ -163,10 +168,11 @@ export default function SignupPage() {
                     value={form.fullName}
                     onChange={onChange}
                     placeholder="Dr. Jane Doe"
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-neutral-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
                   />
                 </div>
 
+                {/* NIC */}
                 <div>
                   <label className="block text-sm text-neutral-300">NIC</label>
                   <input
@@ -174,10 +180,11 @@ export default function SignupPage() {
                     value={form.nic}
                     onChange={onChange}
                     placeholder="200011100123"
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-neutral-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
                   />
                 </div>
 
+                {/* Email */}
                 <div>
                   <label className="block text-sm text-neutral-300">Email</label>
                   <input
@@ -186,10 +193,11 @@ export default function SignupPage() {
                     value={form.email}
                     onChange={onChange}
                     placeholder="you@example.com"
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-neutral-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
                   />
                 </div>
 
+                {/* Phone */}
                 <div>
                   <label className="block text-sm text-neutral-300">Phone Number</label>
                   <input
@@ -198,10 +206,11 @@ export default function SignupPage() {
                     value={form.phoneNo}
                     onChange={onChange}
                     placeholder="+94 71 234 5678"
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-neutral-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
                   />
                 </div>
 
+                {/* Address */}
                 <div className="md:col-span-2">
                   <label className="block text-sm text-neutral-300">Address</label>
                   <input
@@ -209,17 +218,18 @@ export default function SignupPage() {
                     value={form.address}
                     onChange={onChange}
                     placeholder="12, Main Street, Colombo"
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-neutral-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
                   />
                 </div>
 
+                {/* Gender */}
                 <div>
                   <label className="block text-sm text-neutral-300">Gender</label>
                   <select
                     name="gender"
                     value={form.gender}
                     onChange={onChange}
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-neutral-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
                   >
                     <option value="">Select</option>
                     <option>Male</option>
@@ -228,6 +238,7 @@ export default function SignupPage() {
                   </select>
                 </div>
 
+                {/* DOB */}
                 <div>
                   <label className="block text-sm text-neutral-300">Date of Birth</label>
                   <input
@@ -235,13 +246,14 @@ export default function SignupPage() {
                     name="dob"
                     value={form.dob}
                     onChange={onChange}
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-neutral-900/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm outline-none focus:border-cyan-400"
                   />
                 </div>
 
+                {/* Password */}
                 <div>
                   <label className="block text-sm text-neutral-300">Password</label>
-                  <div className="mt-1 flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-900/60 px-3 focus-within:border-cyan-400">
+                  <div className="mt-1 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/60 px-3 focus-within:border-cyan-400">
                     <input
                       type={showPassword ? "text" : "password"}
                       name="password"
@@ -260,9 +272,10 @@ export default function SignupPage() {
                   </div>
                 </div>
 
+                {/* Confirm Password */}
                 <div>
                   <label className="block text-sm text-neutral-300">Confirm Password</label>
-                  <div className="mt-1 flex items-center gap-2 rounded-xl border border-white/10 bg-neutral-900/60 px-3 focus-within:border-cyan-400">
+                  <div className="mt-1 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/60 px-3 focus-within:border-cyan-400">
                     <input
                       type={showConfirm ? "text" : "password"}
                       name="confirmPassword"
@@ -281,6 +294,7 @@ export default function SignupPage() {
                   </div>
                 </div>
 
+                {/* Agreements */}
                 <div className="md:col-span-2 flex flex-col gap-3">
                   <label className="flex items-center gap-2 text-sm text-neutral-300">
                     <input
@@ -288,7 +302,7 @@ export default function SignupPage() {
                       name="remember"
                       checked={form.remember}
                       onChange={onChange}
-                      className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-cyan-400 focus:ring-0"
+                      className="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400 focus:ring-0"
                     />
                     Remember me on this device
                   </label>
@@ -298,39 +312,39 @@ export default function SignupPage() {
                       name="agree"
                       checked={form.agree}
                       onChange={onChange}
-                      className="h-4 w-4 rounded border-white/20 bg-neutral-900 text-cyan-400 focus:ring-0"
+                      className="h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400 focus:ring-0"
                     />
-                    I agree to the <a href="#" className="text-cyan-300 hover:text-cyan-200">Terms</a> and <a href="#" className="text-cyan-300 hover:text-cyan-200">Privacy Policy</a>
+                    I agree to the{" "}
+                    <a href="#" className="text-cyan-300 hover:text-emerald-300">
+                      Terms
+                    </a>{" "}
+                    and{" "}
+                    <a href="#" className="text-cyan-300 hover:text-emerald-300">
+                      Privacy Policy
+                    </a>
                   </label>
                 </div>
 
+                {/* Submit */}
                 <div className="md:col-span-2">
                   <button
                     type="submit"
                     disabled={loading}
-                    className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-3 text-black font-semibold transition focus:outline-none disabled:opacity-70"
+                    className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-cyan-400 to-emerald-500 px-4 py-3 text-black font-semibold transition hover:scale-105 focus:outline-none disabled:opacity-70"
                   >
                     <span className="absolute inset-0 -z-10 bg-white/20 opacity-0 blur transition group-hover:opacity-100" />
                     {loading ? "Creating account…" : "Create account"}
                   </button>
                 </div>
 
-                <div className="md:col-span-2">
-                  <div className="relative my-3 text-center text-xs text-neutral-400">
-                    <span className="relative z-10 bg-neutral-950 px-2">or</span>
-                    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-white/10" />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button type="button" className="rounded-xl border border-white/10 bg-neutral-900/60 px-4 py-2.5 text-sm text-neutral-200 hover:border-cyan-400">Continue with Google</button>
-                    <button type="button" className="rounded-xl border border-white/10 bg-neutral-900/60 px-4 py-2.5 text-sm text-neutral-200 hover:border-cyan-400">Continue with Microsoft</button>
-                  </div>
-                </div>
-
                 <p className="md:col-span-2 text-center text-sm text-neutral-300">
-                  Already have an account? <a href="/login" className="text-cyan-300 hover:text-cyan-200">Sign in</a>
+                  Already have an account?{" "}
+                  <a href="/login" className="text-cyan-300 hover:text-emerald-300">
+                    Sign in
+                  </a>
                 </p>
 
-                <p className="md:col-span-2 pt-2 text-center text-xs text-neutral-400">
+                <p className="md:col-span-2 pt-2 text-center text-xs text-neutral-500">
                   We never share your data. Educational support — not a medical diagnosis.
                 </p>
               </form>

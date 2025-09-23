@@ -1,15 +1,48 @@
-import React, { useContext, useState } from "react";
+// frontend/src/pages/HomePage.jsx
+import React, { useContext, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { AppContent } from "../context/AppContext";
+import {
+  Stethoscope,
+  FileUp,
+  MessageSquare,
+  ClipboardList,
+  BookOpen,
+  Lightbulb,
+  LogOut,
+  Settings,
+  User,
+} from "lucide-react";
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { backendUrl, userData } = useContext(AppContent);
 
+  // File upload state
   const [file, setFile] = useState(null);
   const [caseId, setCaseId] = useState("");
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  // Outputs
+  const [translatorOutput, setTranslatorOutput] = useState("");
+  const [summaryOutput, setSummaryOutput] = useState("");
+  const [adviceOutput, setAdviceOutput] = useState("");
+
+  // Chat state
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  // Profile dropdown
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   // Upload handler
   const onUpload = async () => {
@@ -20,242 +53,285 @@ export default function HomePage() {
     form.append("file", file);
 
     try {
+      setUploading(true);
+      setError("");
       const { data } = await axios.post(`${backendUrl}/api/cases`, form, {
         withCredentials: true,
         headers: { "X-User-Id": userData.userId },
       });
       setCaseId(data.case_id);
-      setError("");
+
+      // Clear chosen file after upload
+      setFile(null);
+      document.getElementById("reportUpload").value = "";
+
+      // Demo outputs
+      setTranslatorOutput("📝 Medical terms translated into plain Sinhala/English...");
+      setSummaryOutput("📑 Concise summary of the uploaded report...");
+      setAdviceOutput("💡 Personalized advice and recommendations...");
     } catch (err) {
       console.error(err?.response?.data || err.message);
-      setError("Upload failed. Please try again.");
+      setError("⚠️ Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
     }
   };
 
-  const stats = [
-    { label: "Total Reports", value: 18 },
-    { label: "Processed", value: 14 },
-    { label: "Pending", value: 4 },
-  ];
+  // Chat send
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const userMessage = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setLoading(true);
 
-  const assistants = [
-    {
-      key: "translator",
-      name: "Term Translator",
-      desc: "Convert jargon to plain Sinhala/English.",
-      accent: "from-cyan-400 to-sky-500",
-      onClick: () => navigate("/assistant/translator"),
-    },
-    {
-      key: "summary",
-      name: "Summary Agent",
-      desc: "Concise, cited report summaries.",
-      accent: "from-fuchsia-400 to-pink-500",
-      onClick: () => navigate("/assistant/summary"),
-    },
-    {
-      key: "advice",
-      name: "Advice Agent",
-      desc: "Educational guidance & questions.",
-      accent: "from-emerald-400 to-teal-500",
-      onClick: () => navigate("/assistant/advice"),
-    },
-  ];
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/chat/rag/chat`,
+        { query: userMessage.content },
+        {
+          withCredentials: true,
+          headers: { "X-User-Id": userData?.userId },
+        }
+      );
+      const botMessage = { role: "assistant", content: data.answer };
+      setMessages((prev) => [...prev, botMessage]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "⚠️ Failed to get a response." },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const goProfile = () => navigate("/profile");
-  const goChat = () => navigate("/chat");
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
 
   return (
-    <div className="relative min-h-screen w-full bg-neutral-950 text-white">
-      <StethoscopeBackdrop />
+    <div className="min-h-screen w-full bg-slate-950 text-white flex flex-col relative">
+      <Backdrop />
 
-      <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col gap-8 px-6 py-8">
-        {/* Top bar */}
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-fuchsia-500 text-black font-black">
-              MR
-            </div>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">
-                MedReport Assist
-              </h1>
-              <p className="text-xs text-neutral-300">
-                Private • Safe • Cited
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={goProfile}
-            className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:border-cyan-400"
-          >
-            <img
-              src={userData?.avatar || "https://i.pravatar.cc/120?img=12"}
-              alt="avatar"
-              className="h-8 w-8 rounded-full"
-            />
-            <span className="hidden sm:inline">
-              {userData?.name || "Guest"}
-            </span>
-          </button>
-        </header>
+      {/* Navbar */}
+      <nav className="flex justify-between items-center px-6 py-4 border-b border-white/10 bg-slate-900/70 backdrop-blur-lg z-10 relative">
+        <div className="flex items-center gap-2">
+          <Stethoscope className="text-cyan-400" />
+          <span className="font-bold text-lg">MedReport Assist</span>
+        </div>
+        <div className="flex items-center gap-6">
+          <button onClick={() => navigate("/reports")}>Reports</button>
+          <button onClick={() => navigate("/assistants")}>Assistants</button>
+          <button onClick={() => navigate("/chat")}>Chat</button>
 
-        {/* Hero */}
-        <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-cyan-950/60 via-indigo-950/40 to-fuchsia-950/50 p-6 md:p-8">
-          <div className="grid gap-6 md:grid-cols-[1.2fr_1fr] md:items-center">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <img
-                  src={userData?.avatar || "https://i.pravatar.cc/120?img=12"}
-                  alt="avatar"
-                  className="h-14 w-14 rounded-full ring-2 ring-white/10"
-                />
-                <div>
-                  <h2 className="text-2xl font-bold leading-tight">
-                    Welcome back, {userData?.name || "Guest"}
-                  </h2>
-                  <p className="text-sm text-neutral-300">
-                    Your reports at a glance • {userData?.role || "Patient"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-3 pt-2">
-                <ActionButton
-                  label="Open Chatbot"
-                  onClick={goChat}
-                  gradient="from-cyan-400 to-sky-500"
-                  icon={<span>💬</span>}
-                />
-                <ActionButton
-                  label="View Profile"
-                  onClick={goProfile}
-                  gradient="from-amber-300 to-orange-400"
-                  icon={<span>👤</span>}
-                />
-              </div>
-            </div>
-
-            {/* Quick upload */}
-            <div className="rounded-xl border border-dashed border-white/15 bg-white/5 p-5">
-              <p className="text-sm text-neutral-300">Quick Upload</p>
-              <div className="mt-3 space-y-3 text-center">
-                <input
-                  type="file"
-                  accept="application/pdf,image/*"
-                  onChange={(e) => setFile(e.target.files?.[0])}
-                  className="block w-full text-sm text-neutral-300"
-                />
-                <button
-                  onClick={onUpload}
-                  className="mt-2 rounded-lg bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-black"
-                >
-                  Upload
-                </button>
-                {error && (
-                  <p className="text-sm text-red-400 font-medium">{error}</p>
-                )}
-                {caseId && (
-                  <div className="mt-3 text-left">
-                    <p className="text-xs text-green-400 font-medium">
-                      ✅ Uploaded • Case ID:{" "}
-                      <span className="text-cyan-400">{caseId}</span>
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Stats */}
-        <section className="grid gap-4 sm:grid-cols-3">
-          {stats.map((s) => (
-            <div
-              key={s.label}
-              className="rounded-xl border border-white/10 bg-white/5 p-4"
+          {/* 🚀 Profile dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setDropdownOpen((prev) => !prev)}
+              className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold hover:shadow-lg hover:scale-105 transition"
             >
-              <p className="text-sm text-neutral-300">{s.label}</p>
-              <p className="mt-1 text-2xl font-bold">{s.value}</p>
-            </div>
-          ))}
+              <img
+                src={userData?.avatar || "https://i.pravatar.cc/40"}
+                alt="avatar"
+                className="h-9 w-9 rounded-full border border-white/20"
+              />
+              <span className="hidden sm:inline">{userData?.name || "Profile"}</span>
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-white/10 rounded-lg shadow-lg z-20 animate-fadeIn">
+                <button
+                  onClick={() => navigate("/profile")}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
+                >
+                  <User className="h-4 w-4 text-cyan-400" /> Profile
+                </button>
+                <button
+                  onClick={() => alert("⚙️ Settings page coming soon!")}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
+                >
+                  <Settings className="h-4 w-4 text-emerald-400" /> Settings
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 text-red-400 transition"
+                >
+                  <LogOut className="h-4 w-4" /> Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      <main className="flex-1 p-6 space-y-10 max-w-7xl mx-auto w-full">
+        {/* Welcome */}
+        <section className="text-center">
+          <h1 className="text-3xl font-bold">
+            Welcome back, <span className="text-cyan-400">{userData?.name || "Guest"}</span>
+          </h1>
+          <p className="text-sm text-neutral-400 mt-1">
+            Your role: {userData?.role || "Patient"}
+          </p>
         </section>
 
-        {/* Main grid */}
-        <section className="grid gap-6 lg:grid-cols-3">
-          {/* Recent reports */}
-          <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-white/5">
-            <div className="flex items-center justify-between border-b border-white/10 p-4">
-              <h3 className="text-lg font-semibold">Recent Reports</h3>
-              <button className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm hover:border-cyan-400">
-                View all
+        {/* Upload */}
+        <section className="relative rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center hover:shadow-xl transition-all overflow-hidden">
+          {/* Progress bar */}
+          {uploading && (
+            <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400 animate-[progress_2s_linear_infinite]" />
+          )}
+
+          <FileUp
+            className={`mx-auto h-12 w-12 ${
+              uploading ? "text-emerald-400 animate-spin" : "text-cyan-400 animate-bounce"
+            }`}
+          />
+          <p className="mt-2 text-sm text-neutral-300">
+            Drag & drop your medical report or select below
+          </p>
+          <input
+            id="reportUpload"
+            type="file"
+            accept="application/pdf,image/*"
+            onChange={(e) => setFile(e.target.files?.[0])}
+            className="mt-4 block w-full text-sm text-neutral-300"
+            disabled={uploading}
+          />
+          <button
+            onClick={onUpload}
+            disabled={uploading || !file}
+            className="mt-4 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-6 py-2 text-sm font-semibold text-black hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {uploading ? "⏳ Uploading..." : "Upload"}
+          </button>
+          {error && <p className="mt-2 text-red-400 text-sm">{error}</p>}
+          {caseId && !error && (
+            <p className="mt-3 text-green-400 text-sm">
+              ✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span>
+            </p>
+          )}
+        </section>
+
+        {/* Outputs */}
+        {caseId && (
+          <section className="grid gap-6 md:grid-cols-3">
+            <AgentPanel title="Term Translator" icon={<ClipboardList />} content={translatorOutput} />
+            <AgentPanel title="Summary Agent" icon={<BookOpen />} content={summaryOutput} />
+            <AgentPanel title="Advice Agent" icon={<Lightbulb />} content={adviceOutput} />
+          </section>
+        )}
+
+        {/* Chatbot */}
+        <section className="flex flex-col h-[500px] border border-white/10 rounded-2xl overflow-hidden">
+          <header className="p-4 border-b border-white/10 flex items-center gap-2 bg-white/5">
+            <MessageSquare className="text-cyan-400" />
+            <h1 className="text-lg font-semibold">💬 MedReport Chatbot</h1>
+          </header>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950">
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                className={`flex items-end gap-2 ${
+                  m.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                {m.role === "assistant" && (
+                  <img
+                    src="https://i.pravatar.cc/40?img=65"
+                    alt="bot"
+                    className="h-8 w-8 rounded-full"
+                  />
+                )}
+                <div
+                  className={`max-w-lg rounded-2xl px-4 py-2 text-sm whitespace-pre-line shadow-md ${
+                    m.role === "user"
+                      ? "bg-gradient-to-r from-cyan-500 to-emerald-500 text-black"
+                      : "bg-white/10 text-neutral-100"
+                  }`}
+                >
+                  {m.content}
+                </div>
+                {m.role === "user" && (
+                  <img
+                    src={userData?.avatar || "https://i.pravatar.cc/40"}
+                    alt="me"
+                    className="h-8 w-8 rounded-full"
+                  />
+                )}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-white/10 p-4 bg-slate-900">
+            <div className="flex gap-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                placeholder="Type your message..."
+                className="flex-1 resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-white focus:outline-none"
+              />
+              <button
+                onClick={handleSend}
+                disabled={loading}
+                className="rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50 hover:scale-105 transition"
+              >
+                {loading ? "..." : "Send"}
               </button>
             </div>
-            <div className="divide-y divide-white/10">
-              {/* map dummy reports here */}
-            </div>
-          </div>
-
-          {/* Assistants hub */}
-          <div className="rounded-2xl border border-white/10 bg-white/5">
-            <div className="border-b border-white/10 p-4">
-              <h3 className="text-lg font-semibold">AI Assistants</h3>
-              <p className="mt-1 text-sm text-neutral-300">
-                Tap to start a new session
-              </p>
-            </div>
-            <div className="p-4 space-y-3">
-              {assistants.map((a) => (
-                <button
-                  key={a.key}
-                  onClick={a.onClick}
-                  className="group block w-full rounded-xl border border-white/10 bg-white/5 p-4 text-left hover:border-cyan-400"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold">{a.name}</p>
-                      <p className="text-sm text-neutral-300">{a.desc}</p>
-                    </div>
-                    <div
-                      className={`grid h-10 w-10 place-items-center rounded-lg bg-gradient-to-br ${a.accent} text-black font-bold`}
-                    >
-                      🩺
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
           </div>
         </section>
+      </main>
+    </div>
+  );
+}
+
+// Agent output panel
+function AgentPanel({ title, icon, content }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col hover:scale-[1.02] transition">
+      <div className="flex items-center gap-2 mb-3 text-cyan-300">
+        {icon}
+        <h3 className="font-semibold">{title}</h3>
+      </div>
+      <div className="flex-1 text-sm text-neutral-200 overflow-y-auto whitespace-pre-line">
+        {content || "Awaiting results..."}
       </div>
     </div>
   );
 }
 
-function ActionButton({ label, onClick, gradient, icon }) {
+// Medical-style backdrop
+function Backdrop() {
   return (
-    <button
-      onClick={onClick}
-      className={`group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r ${gradient} px-4 py-2 text-sm font-semibold text-black`}
-    >
-      <span className="grid h-6 w-6 place-items-center rounded-md bg-black/10">
-        {icon}
-      </span>
-      {label}
-    </button>
-  );
-}
-
-function StethoscopeBackdrop() {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-60">
-      <div
-        className="absolute -top-40 -right-40 h-[38rem] w-[38rem] rounded-full blur-3xl"
-        style={{ background: "radial-gradient(closest-side,#22d3ee22,transparent)" }}
-      />
-      <div
-        className="absolute -bottom-40 -left-40 h-[38rem] w-[38rem] rounded-full blur-3xl"
-        style={{ background: "radial-gradient(closest-side,#a78bfa22,transparent)" }}
-      />
+    <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-40">
+      <div className="absolute -top-40 -right-40 h-[40rem] w-[40rem] rounded-full blur-3xl bg-cyan-500/20 animate-pulse" />
+      <div className="absolute -bottom-40 -left-40 h-[40rem] w-[40rem] rounded-full blur-3xl bg-emerald-500/20 animate-pulse" />
     </div>
   );
 }
+
+/* Tailwind extra keyframes in globals.css:
+@keyframes progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.animate-[progress_2s_linear_infinite] {
+  animation: progress 2s linear infinite;
+}
+*/

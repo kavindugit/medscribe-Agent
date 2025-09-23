@@ -1,3 +1,4 @@
+//backend/server.js
 import express from "express";
 import cors from "cors";
 import 'dotenv/config';
@@ -7,7 +8,6 @@ import authRouter from "./routes/authRoutes.js";
 import userRouter from "./routes/userRouter.js";
 import casesRouter from "./routes/casesRoutes.js";
 import indexRouter from "./routes/indexRoutes.js";
-import conversationsRouter from "./routes/coversationRoutes.js";
 import chatRouter from "./routes/chatRoutes.js";
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -22,8 +22,7 @@ app.use('/api/auth',authRouter );
 app.use('/api/user',userRouter);
 app.use('/api/cases', casesRouter);
 app.use('/api/index', indexRouter);
-app.use('/api/conversations', conversationsRouter);
-app.use('/api', chatRouter);
+app.use('/api/chat', chatRouter);
 
 app.listen(PORT,()=> console.log(`Server is running on port ${PORT}`));
 

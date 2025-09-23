@@ -1,4 +1,3 @@
-// backend/src/controllers/chatController.js
 import { ai } from "../lib/aiClient.js";
 
 const getUserIdFromReq = (req) =>
@@ -6,16 +5,14 @@ const getUserIdFromReq = (req) =>
 
 /**
  * POST /api/rag/chat
- * Forward chatbot queries to FastAPI RAG endpoint
+ * Proxy chat requests to FastAPI RAG service
  */
 export const ragChat = async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
 
     const r = await ai.post("/rag/chat", req.body, {
-      headers: {
-        "X-User-Id": userId,
-      },
+      headers: { "X-User-Id": userId },
       validateStatus: () => true,
       timeout: 60_000,
     });

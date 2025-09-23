@@ -1,13 +1,10 @@
+// backend/models/conversationModel.js
 import mongoose from "mongoose";
 
 const conversationSchema = new mongoose.Schema({
   user_id: {
     type: String, // reference to users.userId
     required: true,
-  },
-  case_id: {
-    type: String, // reference to cases._id
-    required: false, // sometimes chat may not be tied to a specific case
   },
   query: {
     type: String, // user message
@@ -17,14 +14,19 @@ const conversationSchema = new mongoose.Schema({
     type: String, // chatbot response
     required: true,
   },
+  case_ids: {
+    type: [String], // optional: store which case(s) were used in RAG
+    default: [],
+  },
   timestamp: {
     type: Date,
-    default: Date.now, // auto add time of conversation
+    default: Date.now,
   },
 });
 
-// ✅ Create model (reuse if already registered)
+// ✅ Prevent model overwrite in dev
 const conversationModel =
-  mongoose.models.Conversations || mongoose.model("Conversations", conversationSchema);
+  mongoose.models.Conversations ||
+  mongoose.model("Conversations", conversationSchema);
 
 export default conversationModel;

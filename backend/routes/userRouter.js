@@ -1,3 +1,4 @@
+//backend/routes/userRouter.js
 import express from 'express';
 
 import userAuth from '../middleware/userAuth.js';

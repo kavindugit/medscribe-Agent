@@ -1,4 +1,3 @@
-# app/chatbot/agents/faithfulness.py
 from typing import Dict, Any
 from .base import BaseAgent
 from app.chatbot.services.llm_service import LLMService
@@ -13,6 +12,10 @@ class FaithfulnessCheckerAgent(BaseAgent):
         self.llm = LLMService()
 
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        if state.get("intent") == "general_health":
+            # Don’t enforce fact-checking for general health answers
+            return state
+
         response = state.get("response", "")
         report_context = "\n".join([d.get("chunk", "") for d in state.get("docs", [])])
         short_context = "\n".join(state.get("history", []))
