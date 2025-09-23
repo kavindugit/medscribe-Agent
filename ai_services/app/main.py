@@ -20,10 +20,10 @@ app = FastAPI(title="ai_services")
 app.include_router(health_router)
 app.include_router(ingest_router)
 app.include_router(cases_router)
-app.include_router(classifier_router)
 app.include_router(translator_router)
 app.include_router(rag_chat_router)
 app.include_router(summarizer_router)
+app.include_router(classifier_router)
 
 
 
