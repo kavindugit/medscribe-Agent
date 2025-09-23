@@ -2,6 +2,7 @@ import uuid
 from typing import List
 from datetime import datetime
 from app.storage.qdrant_client import qdrant_client, embeddings, get_or_create_collection
+from qdrant_client.http import models as qmodels
 
 class LongTermMemory:
     COLLECTION = "conversation_memory"
@@ -33,35 +34,47 @@ class LongTermMemory:
     def search(self, query: str, user_id: str, case_id: str, top_k: int = 3) -> List[str]:
         """Search summaries using semantic similarity + filters."""
         vector = embeddings.embed_query(query)
+
         results = qdrant_client.search(
             collection_name=self.COLLECTION,
             query_vector=vector,
             limit=top_k,
-            query_filter={"must": [
-                {"key": "user_id", "match": {"value": user_id}},
-                {"key": "case_id", "match": {"value": case_id}}
-            ]}
+            query_filter=qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="user_id", match=qmodels.MatchValue(value=user_id)
+                    ),
+                    qmodels.FieldCondition(
+                        key="case_id", match=qmodels.MatchValue(value=case_id)
+                    )
+                ]
+            )
         )
         return [r.payload["summary"] for r in results]
 
     def cleanup_old_summaries(self, user_id: str, case_id: str, max_summaries: int = 20) -> None:
         """Keep only the `max_summaries` most recent summaries per user/case."""
-        results = qdrant_client.scroll(
+        results, _ = qdrant_client.scroll(
             collection_name=self.COLLECTION,
-            scroll_filter={"must": [
-                {"key": "user_id", "match": {"value": user_id}},
-                {"key": "case_id", "match": {"value": case_id}}
-            ]},
+            scroll_filter=qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="user_id", match=qmodels.MatchValue(value=user_id)
+                    ),
+                    qmodels.FieldCondition(
+                        key="case_id", match=qmodels.MatchValue(value=case_id)
+                    )
+                ]
+            ),
             limit=1000
         )
 
-        points = results[0] if results else []
-        if len(points) <= max_summaries:
+        if len(results) <= max_summaries:
             return
 
         # Sort by timestamp
         sorted_points = sorted(
-            points,
+            results,
             key=lambda p: p.payload.get("created_at", ""),
             reverse=True
         )
@@ -71,5 +84,5 @@ class LongTermMemory:
         if to_delete:
             qdrant_client.delete(
                 collection_name=self.COLLECTION,
-                points_selector={"points": to_delete}
+                points_selector=qmodels.PointIdsList(points=to_delete)
             )
