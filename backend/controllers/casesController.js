@@ -115,7 +115,7 @@ export const getCleaned = async (req, res) => {
   const { id } = req.params;
   const userId = getUserIdFromReq(req);
   try {
-    const r = await ai.get(`/cases/${id}/file/cleaned`, {
+    const r = await ai.get(`/cases/${id}/file/cleaned/stream`, {
       headers: { "X-User-Id": userId },
       validateStatus: () => true,
     });
