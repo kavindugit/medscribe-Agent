@@ -1,10 +1,11 @@
+# app/chatbot/routes/rag.py
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
 
-from app.chatbot.agents.rag_agent import rag_answer
+from app.chatbot.orchestrator.graph import build_chatbot_graph, inject_memory
 from app.chatbot.utils.intent_classifier import classify_intent
 from app.storage.conversations_mongo import save_conversation
 from app.storage.mongo_client import get_cases_collection
@@ -12,7 +13,7 @@ from app.storage.mongo_client import get_cases_collection
 router = APIRouter(prefix="/rag", tags=["chatbot-rag"])
 
 # -----------------------------
-# Request / Response Models
+# Models
 # -----------------------------
 class RAGQuery(BaseModel):
     query: str
@@ -26,7 +27,12 @@ class RAGResponse(BaseModel):
     memory_used: Dict[str, Any] = {}
 
 # -----------------------------
-# Endpoint
+# Build once at startup
+# -----------------------------
+chatbot_graph = build_chatbot_graph()
+
+# -----------------------------
+# Routes
 # -----------------------------
 @router.post("/chat", response_model=RAGResponse)
 async def rag_chat(
@@ -73,15 +79,20 @@ async def rag_chat(
         }
 
     # -----------------------------
-    # Default: REPORT_QUESTION or GENERAL_HEALTH → use RAG
+    # Default: route through LangGraph pipeline
     # -----------------------------
     try:
-        answer, memory_used, case_ids = rag_answer(
-            user_id=x_user_id,
-            query=query,
-            case_id=payload.case_id,
-            top_k=payload.top_k,
-        )
+        state = {
+            "query": query,
+            "user_id": x_user_id,
+            "case_id": payload.case_id,
+        }
+        state = inject_memory(state)
+
+        final_state = chatbot_graph.invoke(state)
+
+        answer = final_state.get("response", "⚠️ No answer generated.")
+        case_ids = final_state.get("case_ids", [])
 
         # Save conversation turn
         save_conversation({
@@ -97,8 +108,11 @@ async def rag_chat(
             "query": query,
             "answer": answer,
             "meta": {"case_ids": case_ids, "user_id": x_user_id},
-            "memory_used": memory_used,
+            "memory_used": {
+                "short_term": state.get("history", []),
+                "long_term": state.get("long_memory", []),
+            }
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"RAG error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"RAG pipeline error: {str(e)}")
