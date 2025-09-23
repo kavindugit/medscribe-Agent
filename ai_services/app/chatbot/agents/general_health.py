@@ -1,4 +1,3 @@
-# ai_services/app/chatbot/agents/general_health.py
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -12,16 +11,17 @@ class GeneralHealthAgent:
         self.llm = ChatGoogleGenerativeAI(
             model=os.getenv("LLM_FALLBACK_MODEL", "gemini-1.5-flash"),
             api_key=os.getenv("GOOGLE_API_KEY"),
-            temperature=0.3,
+            temperature=0.5,   # slightly higher for richer responses
         )
 
     def run(self, state: dict) -> dict:
         query = state["query"]
         prompt = (
-            "You are a trusted medical assistant. Answer the following question "
-            "in a safe, general, patient-friendly way. "
-            "Do not provide diagnoses or treatment plans. "
-            "If it's about prevention or lifestyle, provide clear advice.\n\n"
+            "You are a trusted medical assistant. The user is asking a general health question.\n"
+            "Answer in a clear, helpful, and patient-friendly way. Include practical lifestyle "
+            "tips (e.g., diet, exercise, sleep, stress management) if relevant.\n\n"
+            "⚠️ Do not give diagnoses or prescriptions.\n"
+            "End with a disclaimer: 'This is general advice, please consult your doctor for personalized guidance.'\n\n"
             f"Question: {query}"
         )
         try:

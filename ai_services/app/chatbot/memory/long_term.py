@@ -1,3 +1,4 @@
+# ai_services/app/chatbot/memory/long_term.py
 import uuid
 from typing import List
 from datetime import datetime
@@ -20,8 +21,8 @@ class LongTermMemory:
                 "id": str(uuid.uuid4()),
                 "vector": vector,
                 "payload": {
-                    "user_id": user_id,
-                    "case_id": case_id,
+                    "user_id": str(user_id) if user_id else None,
+                    "case_id": str(case_id) if case_id else None,
                     "summary": summary,
                     "created_at": datetime.utcnow().isoformat()
                 }
@@ -35,37 +36,51 @@ class LongTermMemory:
         """Search summaries using semantic similarity + filters."""
         vector = embeddings.embed_query(query)
 
+        filter_conditions = []
+        if user_id:
+            filter_conditions.append(
+                qmodels.FieldCondition(
+                    key="user_id", match=qmodels.MatchValue(value=str(user_id))
+                )
+            )
+        if case_id:
+            filter_conditions.append(
+                qmodels.FieldCondition(
+                    key="case_id", match=qmodels.MatchValue(value=str(case_id))
+                )
+            )
+
+        query_filter = qmodels.Filter(must=filter_conditions) if filter_conditions else None
+
         results = qdrant_client.search(
             collection_name=self.COLLECTION,
             query_vector=vector,
             limit=top_k,
-            query_filter=qmodels.Filter(
-                must=[
-                    qmodels.FieldCondition(
-                        key="user_id", match=qmodels.MatchValue(value=user_id)
-                    ),
-                    qmodels.FieldCondition(
-                        key="case_id", match=qmodels.MatchValue(value=case_id)
-                    )
-                ]
-            )
+            query_filter=query_filter
         )
         return [r.payload["summary"] for r in results]
 
     def cleanup_old_summaries(self, user_id: str, case_id: str, max_summaries: int = 20) -> None:
         """Keep only the `max_summaries` most recent summaries per user/case."""
+        filter_conditions = []
+        if user_id:
+            filter_conditions.append(
+                qmodels.FieldCondition(
+                    key="user_id", match=qmodels.MatchValue(value=str(user_id))
+                )
+            )
+        if case_id:
+            filter_conditions.append(
+                qmodels.FieldCondition(
+                    key="case_id", match=qmodels.MatchValue(value=str(case_id))
+                )
+            )
+
+        scroll_filter = qmodels.Filter(must=filter_conditions) if filter_conditions else None
+
         results, _ = qdrant_client.scroll(
             collection_name=self.COLLECTION,
-            scroll_filter=qmodels.Filter(
-                must=[
-                    qmodels.FieldCondition(
-                        key="user_id", match=qmodels.MatchValue(value=user_id)
-                    ),
-                    qmodels.FieldCondition(
-                        key="case_id", match=qmodels.MatchValue(value=case_id)
-                    )
-                ]
-            ),
+            scroll_filter=scroll_filter,
             limit=1000
         )
 
