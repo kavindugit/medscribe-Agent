@@ -5,6 +5,8 @@ from app.routes.cases import router as cases_router
 from app.routes.classifier import router as classifier_router
 from app.routes.translator import router as translator_router
 from app.chatbot.routes.rag import router as rag_chat_router   
+from app.routes.summarizer import router as summarizer_router
+
 from app.vector.indexer import ensure_collection
 from dotenv import load_dotenv
 
@@ -21,6 +23,8 @@ app.include_router(cases_router)
 app.include_router(classifier_router)
 app.include_router(translator_router)
 app.include_router(rag_chat_router)
+app.include_router(summarizer_router)
+
 
 
 
