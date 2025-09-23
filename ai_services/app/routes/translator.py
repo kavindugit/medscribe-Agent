@@ -6,7 +6,7 @@ from app.agents.translator.translator_agent import translate_report
 
 router = APIRouter()
 
-@router.post("/translator/")
+@router.post("/translator/", tags=["Translator"])
 async def translate_medical_report(file: UploadFile = File(...)):
     # Save the uploaded file temporarily
     temp_file_path = f"temp_{file.filename}"
