@@ -97,18 +97,25 @@ flowchart LR
 **Sequence (GitHub‑safe)**
 ```mermaid
 sequenceDiagram
-  participant UI as Client UI
-  participant EX as Orchestrator
-  participant AI as AI Service
-  participant V as Vector DB
+  participant UI as Client UI (React/Vite)
+  participant EX as Orchestrator (Express 4000)
+  participant AI as AI Pipeline (FastAPI 8001)
+  participant V as Vector DB (FAISS/Chroma)
+  participant M as MongoDB
 
-  UI->>EX: POST /api/agents/chat (cookie JWT)
-  EX->>AI: POST /ai/v1/retrieve (service JWT)
-  AI->>V: vector search (user namespace)
-  V-->>AI: top k chunks
-  EX->>AI: POST /ai/v1/chat (messages, reportIds)
+  UI->>EX: POST /api/cases (upload report)
+  EX->>M: save case + metadata
+  EX->>AI: POST /ai/v1/pipeline/run { medical_report }
+  AI->>AI: Summarizer → Classifier → Explainer → Translator → Advisor
+  AI->>V: (optional) retrieve chunks (per user namespace)
+  AI-->>EX: SSE stream of agent outputs
+  EX-->>UI: render Summary, Classifier, Explainer, Translator, Advisor panels
+  UI->>EX: POST /api/rag/chat
+  EX->>AI: POST /ai/v1/chat { messages, reportIds }
+  AI->>V: vector search
+  AI->>M: fetch history
   AI-->>EX: answer + citations
-  EX-->>UI: render response
+  EX-->>UI: chatbot message
 ```
 
 **Endpoint contracts (concise)**
