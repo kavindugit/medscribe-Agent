@@ -4,6 +4,8 @@ from app.routes.ingest import router as ingest_router
 from app.routes.cases import router as cases_router
 from app.routes.classifier import router as classifier_router
 from app.routes.translator import router as translator_router
+from app.routes.explain import router as explain_router
+from app.routes.advisor import router as advisor_router
 from app.chatbot.routes.rag import router as rag_chat_router   
 from app.routes.summarizer import router as summarizer_router
 
@@ -21,6 +23,8 @@ app.include_router(health_router)
 app.include_router(ingest_router)
 app.include_router(cases_router)
 app.include_router(translator_router)
+app.include_router(explain_router)
+app.include_router(advisor_router)
 app.include_router(rag_chat_router)
 app.include_router(summarizer_router)
 app.include_router(classifier_router)
