@@ -2,10 +2,11 @@
 from __future__ import annotations
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Header
+from app.storage.azure_client import container_client
 
 from app.storage.mongo_client import get_cases_collection
 from app.storage.azure_client import get_sas_url
-
+from fastapi.responses import StreamingResponse
 router = APIRouter(prefix="/cases", tags=["cases"])
 
 
@@ -91,3 +92,27 @@ async def export_case(case_id: str, x_user_id: Optional[str] = Header(default=No
         },
     }
     return response
+
+
+@router.get("/{case_id}/file/{file_type}/stream")
+async def stream_case_file(case_id: str, file_type: str, x_user_id: Optional[str] = Header(default=None, alias="X-User-Id")):
+    case = get_cases_collection().find_one({"_id": case_id})
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    _require_owner(x_user_id, case.get("user_id", ""))
+
+    key_map = {
+        "raw": "raw_text_path",
+        "cleaned": "cleaned_path",
+        "panels": "panels_path"
+    }
+
+    blob_path = case.get(key_map[file_type])
+    if not blob_path:
+        raise HTTPException(status_code=404, detail=f"{file_type} file not found")
+
+    blob_client = container_client.get_blob_client(blob_path)
+    stream = blob_client.download_blob().chunks()  # generator
+    
+    return StreamingResponse(stream, media_type="application/json") 
