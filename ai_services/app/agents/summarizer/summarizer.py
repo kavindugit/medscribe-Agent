@@ -1,4 +1,4 @@
-# summarizer.py
+# app/agents/summarizer/summarizer.py
 import os
 import getpass
 from langchain.chat_models import init_chat_model
