@@ -1,4 +1,4 @@
-# classifier.py
+# app/agents/classifier/classifier.py
 import os
 import getpass
 from langchain.chat_models import init_chat_model

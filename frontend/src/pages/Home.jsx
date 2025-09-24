@@ -19,15 +19,19 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { backendUrl, userData } = useContext(AppContent);
 
+  const backend_AI = "http://localhost:8001";
+
   // File upload state
   const [file, setFile] = useState(null);
   const [caseId, setCaseId] = useState("");
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  // Outputs
-  const [translatorOutput, setTranslatorOutput] = useState("");
+  // Agent outputs
   const [summaryOutput, setSummaryOutput] = useState("");
+  const [classifierOutput, setClassifierOutput] = useState("");
+  const [explainerOutput, setExplainerOutput] = useState("");
+  const [translatorOutput, setTranslatorOutput] = useState("");
   const [adviceOutput, setAdviceOutput] = useState("");
 
   // Chat state
@@ -55,6 +59,8 @@ export default function HomePage() {
     try {
       setUploading(true);
       setError("");
+
+      // 1️⃣ Upload the file -> get caseId
       const { data } = await axios.post(`${backendUrl}/api/cases`, form, {
         withCredentials: true,
         headers: { "X-User-Id": userData.userId },
@@ -65,15 +71,93 @@ export default function HomePage() {
       setFile(null);
       document.getElementById("reportUpload").value = "";
 
-      // Demo outputs
-      setTranslatorOutput("📝 Medical terms translated into plain Sinhala/English...");
-      setSummaryOutput("📑 Concise summary of the uploaded report...");
-      setAdviceOutput("💡 Personalized advice and recommendations...");
+      // 2️⃣ Fetch cleaned report text
+      const cleaned = await axios.get(
+        `${backendUrl}/api/cases/${data.case_id}/cleaned`,
+        { withCredentials: true, headers: { "X-User-Id": userData.userId } }
+      );
+      const cleanedText = cleaned.data.cleaned_text;
+      console.log("Cleaned text:", cleanedText);
+
+      // 3️⃣ Run pipeline with streaming
+      runPipeline(cleanedText);
     } catch (err) {
       console.error(err?.response?.data || err.message);
       setError("⚠️ Upload failed. Please try again.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Streaming pipeline runner (patched for raw JSON + SSE)
+  const runPipeline = async (cleanedText) => {
+    try {
+      const response = await fetch(`${backend_AI}/pipeline/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ medical_report: cleanedText }),
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // split into events
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || ""; // keep incomplete chunk
+
+        for (const evt of events) {
+          const trimmed = evt.trim();
+          if (!trimmed) continue;
+
+          try {
+            // Support both "data: ..." and raw JSON
+            const jsonStr = trimmed.startsWith("data:")
+              ? trimmed.replace(/^data:\s*/, "")
+              : trimmed;
+
+            const data = JSON.parse(jsonStr);
+
+            switch (data.agent) {
+              case "summarizer":
+                setSummaryOutput(data.output);
+                break;
+              case "classifier":
+                setClassifierOutput(
+                  typeof data.output === "object"
+                    ? JSON.stringify(data.output, null, 2)
+                    : data.output
+                );
+                break;
+              case "explainer":
+                setExplainerOutput(
+                  typeof data.output === "object"
+                    ? JSON.stringify(data.output, null, 2)
+                    : data.output
+                );
+                break;
+              case "translator":
+                setTranslatorOutput(data.output);
+                break;
+              case "advisor":
+                setAdviceOutput(data.output);
+                break;
+              default:
+                console.warn("Unknown agent:", data);
+            }
+          } catch (err) {
+            console.error("❌ Failed to parse JSON:", evt, err);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Pipeline error:", err);
     }
   };
 
@@ -186,7 +270,6 @@ export default function HomePage() {
 
         {/* Upload */}
         <section className="relative rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center hover:shadow-xl transition-all overflow-hidden">
-          {/* Progress bar */}
           {uploading && (
             <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400 animate-[progress_2s_linear_infinite]" />
           )}
@@ -224,9 +307,11 @@ export default function HomePage() {
 
         {/* Outputs */}
         {caseId && (
-          <section className="grid gap-6 md:grid-cols-3">
-            <AgentPanel title="Term Translator" icon={<ClipboardList />} content={translatorOutput} />
+          <section className="flex flex-col gap-6">
             <AgentPanel title="Summary Agent" icon={<BookOpen />} content={summaryOutput} />
+            <AgentPanel title="Classifier Agent" icon={<ClipboardList />} content={classifierOutput} />
+            <AgentPanel title="Explainer Agent" icon={<MessageSquare />} content={explainerOutput} />
+            <AgentPanel title="Term Translator" icon={<ClipboardList />} content={translatorOutput} />
             <AgentPanel title="Advice Agent" icon={<Lightbulb />} content={adviceOutput} />
           </section>
         )}
@@ -238,7 +323,6 @@ export default function HomePage() {
             <h1 className="text-lg font-semibold">💬 MedReport Chatbot</h1>
           </header>
 
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950">
             {messages.map((m, i) => (
               <div
@@ -275,7 +359,6 @@ export default function HomePage() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
           <div className="border-t border-white/10 p-4 bg-slate-900">
             <div className="flex gap-2">
               <textarea
@@ -316,7 +399,7 @@ function AgentPanel({ title, icon, content }) {
   );
 }
 
-// Medical-style backdrop
+// Background
 function Backdrop() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-40">
@@ -325,13 +408,3 @@ function Backdrop() {
     </div>
   );
 }
-
-/* Tailwind extra keyframes in globals.css:
-@keyframes progress {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-.animate-[progress_2s_linear_infinite] {
-  animation: progress 2s linear infinite;
-}
-*/
