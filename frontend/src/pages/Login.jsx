@@ -1,9 +1,11 @@
-// src/pages/LoginPage.jsx
-import React, { useState } from "react";
+// frontend/src/pages/LoginPage.jsx
+import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
+import { AppContent } from "../context/AppContext";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { getUserData } = useContext(AppContent); // ✅ use context function
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +27,7 @@ export default function LoginPage() {
       const res = await fetch("http://localhost:4000/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        credentials: "include",
+        credentials: "include", // ✅ important for cookie session
         body: JSON.stringify({ email, password, remember }),
       });
 
@@ -36,12 +38,15 @@ export default function LoginPage() {
         /* ignore */
       }
 
-      if (!res.ok || !data?.success) {
-        const msg = data?.message || `Login failed (HTTP ${res.status}).`;
-        throw new Error(msg);
-      }
+      if (!res.ok) throw new Error(`Login failed (HTTP ${res.status}).`);
+      if (!data?.success) throw new Error(data?.message || "Login failed.");
 
+      // ✅ Re-fetch current user after login (updates context)
+      await getUserData();
+
+      // ✅ Redirect and force refresh to load new user info
       navigate("/");
+      window.location.reload();
     } catch (err) {
       const msg =
         err?.message === "Failed to fetch"
@@ -55,11 +60,9 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen w-full bg-slate-950 text-white overflow-hidden">
-      {/* 🔥 Animated backdrop */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-40 -right-40 h-[38rem] w-[38rem] rounded-full blur-3xl bg-cyan-500/20 animate-pulse" />
         <div className="absolute -bottom-40 -left-40 h-[38rem] w-[38rem] rounded-full blur-3xl bg-emerald-500/20 animate-pulse" />
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-300/40 via-white/30 to-emerald-300/40" />
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col lg:grid lg:grid-cols-2">
@@ -105,7 +108,6 @@ export default function LoginPage() {
         {/* Right login card */}
         <main className="flex items-center justify-center px-6 py-12">
           <div className="w-full max-w-md">
-            {/* Mobile header */}
             <div className="mb-8 text-center lg:hidden">
               <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 to-emerald-500 text-black font-black">
                 MR
@@ -116,7 +118,6 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Card */}
             <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 shadow-[0_0_40px_-15px_rgba(34,211,238,0.6)] backdrop-blur">
               <form onSubmit={onSubmit} className="space-y-4">
                 {error && (
@@ -126,10 +127,7 @@ export default function LoginPage() {
                 )}
 
                 <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-sm text-neutral-300"
-                  >
+                  <label htmlFor="email" className="block text-sm text-neutral-300">
                     Email
                   </label>
                   <input
@@ -144,10 +142,7 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label
-                    htmlFor="password"
-                    className="block text-sm text-neutral-300"
-                  >
+                  <label htmlFor="password" className="block text-sm text-neutral-300">
                     Password
                   </label>
                   <div className="mt-1 flex items-center gap-2 rounded-xl border border-white/10 bg-slate-950/60 px-3 focus-within:border-cyan-400">
@@ -164,7 +159,6 @@ export default function LoginPage() {
                       type="button"
                       onClick={() => setShowPassword((s) => !s)}
                       className="rounded-lg px-2 py-1 text-xs text-neutral-300 hover:text-white"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? "Hide" : "Show"}
                     </button>
@@ -181,10 +175,7 @@ export default function LoginPage() {
                     />
                     Remember me
                   </label>
-                  <a
-                    href="#"
-                    className="text-sm text-cyan-300 hover:text-cyan-200"
-                  >
+                  <a href="#" className="text-sm text-cyan-300 hover:text-cyan-200">
                     Forgot password?
                   </a>
                 </div>
@@ -221,10 +212,7 @@ export default function LoginPage() {
 
             <p className="mt-6 text-center text-sm text-neutral-400">
               New to MedReport Assist?{" "}
-              <a
-                href="/signup"
-                className="text-cyan-300 hover:text-emerald-300"
-              >
+              <a href="/signup" className="text-cyan-300 hover:text-emerald-300">
                 Create an account
               </a>
             </p>

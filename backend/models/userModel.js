@@ -50,6 +50,18 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: 'Active',
     },
+    plan:{
+        type: String,
+        default: 'Free',
+    },
+    planExpireAt:{
+        type: Date,
+        default: null,
+    },
+    deleteDataAt:{
+        type: Date,
+        default: null,
+    },
     verifyOtp: {
         type: String,
         default: '',
