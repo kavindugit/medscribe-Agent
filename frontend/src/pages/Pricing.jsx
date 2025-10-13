@@ -10,34 +10,14 @@ export default function Pricing() {
   const navigate = useNavigate();
 
   // 🔹 Simulate a payment and update plan
-  const handleBuyPlan = async (planType) => {
-    if (!userData?.userId) {
-      toast.error("Please log in to upgrade your plan.");
-      navigate("/login");
-      return;
-    }
-
-    setLoadingPlan(planType);
-    try {
-      const { data } = await axios.post(
-        `${backendUrl}/api/plan/simulate`,
-        { userId: userData.userId, planType },
-        { withCredentials: true }
-      );
-
-      if (data.success) {
-        toast.success(data.message || "Plan updated successfully!");
-        setTimeout(() => navigate("/"), 1500);
-      } else {
-        toast.error(data.message || "Payment simulation failed.");
-      }
-    } catch (error) {
-      console.error("Plan update error:", error);
-      toast.error("Something went wrong. Try again later.");
-    } finally {
-      setLoadingPlan(null);
-    }
-  };
+ const handleBuyPlan = (planType) => {
+  if (!userData?.userId) {
+    toast.error("Please log in to upgrade your plan.");
+    navigate("/login");
+    return;
+  }
+  navigate(`/payment/${planType}`);
+};
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 font-sans">

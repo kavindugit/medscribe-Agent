@@ -156,33 +156,55 @@ export const simulatePayment = async (req, res) => {
 /* -------------------------
    🔹 Auto Downgrade Expired Plans (CRON / Manual)
 -------------------------- */
+/* -------------------------
+   🔹 Auto Downgrade Expired Plans + Cleanup DeleteData
+-------------------------- */
 export const downgradeExpiredPlans = async (req, res) => {
   try {
     const now = new Date();
 
+    // 1️⃣ Find users whose plan has expired but not yet downgraded
     const expiredUsers = await userModel.find({
       planExpireAt: { $lte: now },
       plan: { $ne: "Free" },
     });
 
-    if (!expiredUsers.length)
-      return res.json({ success: true, message: "No expired plans found." });
+    // 2️⃣ Find users whose deleteDataAt is due (cleanup stage)
+    const cleanupUsers = await userModel.find({
+      deleteDataAt: { $lte: now, $ne: null },
+    });
 
-    for (let user of expiredUsers) {
+    // Downgrade expired plans
+    for (const user of expiredUsers) {
+      console.log(`⚙️ Downgrading ${user.fullName} (${user.userId}) to Free plan`);
+
       user.plan = "Free";
+      // keep deleteDataAt unchanged here
       user.planExpireAt = null;
-      user.deleteDataAt = null;
+
       await user.save();
 
+      // Reset usage limits to Free plan
       await syncUsageWithPlan(user.userId, "Free");
     }
 
-    res.json({
+    // Cleanup deleteDataAt
+    for (const user of cleanupUsers) {
+      console.log(`🧹 Cleaning expired data for ${user.fullName} (${user.userId})`);
+
+      user.deleteDataAt = null;
+      await user.save();
+    }
+
+    const totalDowngraded = expiredUsers.length;
+    const totalCleaned = cleanupUsers.length;
+
+    return res.json({
       success: true,
-      message: `Downgraded ${expiredUsers.length} expired users to Free plan.`,
+      message: `✅ ${totalDowngraded} plans downgraded, ${totalCleaned} user records cleaned.`,
     });
   } catch (error) {
-    console.error("Error downgrading expired plans:", error);
-    res.json({ success: false, message: error.message });
+    console.error("Error in auto plan downgrade:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
