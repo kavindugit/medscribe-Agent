@@ -116,3 +116,34 @@ async def stream_case_file(case_id: str, file_type: str, x_user_id: Optional[str
     stream = blob_client.download_blob().chunks()  # generator
     
     return StreamingResponse(stream, media_type="application/json") 
+
+
+@router.delete("/{case_id}/delete-files")
+async def delete_case_files(case_id: str):
+    """
+    Delete all blobs under the given case folder (e.g. cases/{case_id}/) in Azure Blob Storage.
+    """
+    try:
+        # The folder prefix in your container
+        folder_prefix = f"cases/{case_id}/"
+
+        # List all blobs under that folder
+        blobs = container_client.list_blobs(name_starts_with=folder_prefix)
+        blob_names = [b.name for b in blobs]
+
+        if not blob_names:
+            raise HTTPException(status_code=404, detail=f"No blobs found for case {case_id}")
+
+        # Delete all blobs
+        for name in blob_names:
+            blob_client = container_client.get_blob_client(name)
+            blob_client.delete_blob()
+
+        return {
+            "message": f"✅ Deleted {len(blob_names)} blobs for case {case_id}",
+            "deleted_files": blob_names,
+        }
+
+    except Exception as e:
+        print(f"❌ Error deleting blobs for {case_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete blobs: {str(e)}")
