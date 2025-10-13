@@ -1,7 +1,7 @@
 import userModel from "../models/usermodel.js";
 import usageModel from "../models/usageModel.js";
 import caseModel from "../models/caseModel.js";
-import { ai } from "../lib/aiClient.js"; // ✅ use shared AI client
+import { ai } from "../lib/aiClient.js";
 import { PLAN_LIMITS, getPlanLimits } from "../config/planConfig.js";
 
 /* -------------------------
@@ -152,19 +152,19 @@ export const simulatePayment = async (req, res) => {
 };
 
 /* -------------------------
-   🔹 Auto Downgrade Expired Plans + Cleanup DeleteData
+   🔹 Auto Downgrade Expired Plans + Full Cleanup
 -------------------------- */
 export const downgradeExpiredPlans = async (req, res) => {
   try {
     const now = new Date();
 
-    // 1️⃣ Find users whose plan expired (need downgrade)
+    // 1️⃣ Find users whose plan has expired but not downgraded
     const expiredUsers = await userModel.find({
       planExpireAt: { $lte: now },
       plan: { $ne: "Free" },
     });
 
-    // 2️⃣ Find users whose deleteDataAt passed (cleanup stage)
+    // 2️⃣ Find users whose deleteDataAt is due (cleanup stage)
     const cleanupUsers = await userModel.find({
       deleteDataAt: { $lte: now, $ne: null },
     });
@@ -174,13 +174,13 @@ export const downgradeExpiredPlans = async (req, res) => {
       console.log(`⚙️ Downgrading ${user.fullName} (${user.userId}) to Free plan`);
 
       user.plan = "Free";
-      user.planExpireAt = null;
+      user.planExpireAt = null; // keep deleteDataAt until cleanup
       await user.save();
 
       await syncUsageWithPlan(user.userId, "Free");
     }
 
-    // 🔸 Step 2: Cleanup expired data
+    // 🔸 Step 2: Cleanup user data (Azure, Qdrant, Mongo)
     for (const user of cleanupUsers) {
       console.log(`🧹 Cleaning expired data for ${user.fullName} (${user.userId})`);
 
@@ -188,19 +188,23 @@ export const downgradeExpiredPlans = async (req, res) => {
 
       for (const caseDoc of userCases) {
         try {
-          // ✅ Delete case files
+          // 1️⃣ Delete case files in Azure Blob
           await ai.delete(`/cases/${caseDoc.case_id}/delete-files`);
-          console.log(`🗑️ Deleted case files for ${caseDoc.case_id}`);
+          console.log(`🗑️ Deleted files for case ${caseDoc.case_id}`);
 
-          // ✅ Delete vector indexes
+          // 2️⃣ Delete vector indexes in Qdrant / FAISS
           await ai.delete(`/vector/cleanup/${caseDoc.case_id}`);
-          console.log(`🧠 Deleted vector index for ${caseDoc.case_id}`);
+          console.log(`🧠 Deleted vectors for case ${caseDoc.case_id}`);
         } catch (err) {
           console.warn(`⚠️ Cleanup failed for case ${caseDoc.case_id}: ${err.message}`);
         }
       }
 
-      // ✅ Remove deleteDataAt (mark cleanup complete)
+      // 3️⃣ Delete all case rows from MongoDB for this user
+      const deleted = await caseModel.deleteMany({ userId: user.userId });
+      console.log(`🧾 Removed ${deleted.deletedCount} cases from Mongo for ${user.userId}`);
+
+      // ✅ Clear deleteDataAt to mark cleanup done
       user.deleteDataAt = null;
       await user.save();
     }
@@ -210,7 +214,7 @@ export const downgradeExpiredPlans = async (req, res) => {
 
     return res.json({
       success: true,
-      message: `✅ ${totalDowngraded} plans downgraded, ${totalCleaned} user data cleanups completed.`,
+      message: `✅ ${totalDowngraded} plans downgraded, ${totalCleaned} user cleanups fully completed.`,
     });
   } catch (error) {
     console.error("Error in auto plan downgrade:", error);
