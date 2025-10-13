@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import UserProfile from './pages/UserProfile'
 import Pricing from './pages/Pricing'
+import Payment from './pages/Payment'
 
 const App = () => {
   return (
@@ -17,6 +18,7 @@ const App = () => {
         <Route path='/signup' element={<Signup />} />
         <Route path='/profile' element={<UserProfile />} />
         <Route path='/pricing' element={<Pricing />} />
+        <Route path='/payment/:planType' element={<Payment />} />
 
       </Routes>
  

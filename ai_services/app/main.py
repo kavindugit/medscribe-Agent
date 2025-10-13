@@ -13,6 +13,7 @@ from app.routes.summarizer import router as summarizer_router
 from app.routes.pipeline import router as pipeline_router
 from app.vector.indexer import ensure_collection
 from dotenv import load_dotenv
+from app.routes.vector_cleanup import router as vector_cleanup_router
 
 
 load_dotenv()
@@ -47,3 +48,4 @@ app.include_router(rag_chat_router)
 app.include_router(summarizer_router)
 app.include_router(classifier_router)
 app.include_router(pipeline_router)
+app.include_router(vector_cleanup_router)  # Add this line to include the vector cleanup router
