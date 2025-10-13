@@ -33,13 +33,12 @@ async def run_pipeline(file_bytes: bytes, mime: str, user_id: str | None = None)
             },
         )
 
-    # 3) Deterministic normalization
+   
     cleaned_payload = run_normalizer(ing["text"], {"mime": mime})
 
-    # 4) Parse panels
+  
     panels: list[Panel] = parse_text_to_panels(ing["text"])
 
-    # Flatten panels into test lines for enrichment
     lab_lines = []
     for panel in panels:
         for item in panel.items:
@@ -52,27 +51,20 @@ async def run_pipeline(file_bytes: bytes, mime: str, user_id: str | None = None)
         sections["tests"] = "\n".join(lab_lines)
         cleaned_payload = cleaned_payload.copy(update={"sections": sections, "version": 2})
 
-    # -----------------------------
-    # 5) Upload files to Azure Blob
-    # -----------------------------
-
-    # Raw text
+   
     raw_path = f"cases/{case_id}/raw.txt"
     upload_file(raw_path, ing["text"].encode("utf-8"), content_type="text/plain")
 
-    # Cleaned JSON
+ 
     cleaned_path = f"cases/{case_id}/cleaned.json"
     cleaned_bytes = cleaned_payload.model_dump_json(indent=2).encode("utf-8")
     upload_file(cleaned_path, cleaned_bytes, content_type="application/json")
 
-    # Panels JSON
     panels_path = f"cases/{case_id}/panels.json"
     panels_bytes = json.dumps([p.model_dump() for p in panels], indent=2).encode("utf-8")
     upload_file(panels_path, panels_bytes, content_type="application/json")
 
-    # -----------------------------
-    # 6) Save metadata to MongoDB
-    # -----------------------------
+  
     report_name, hospital, doctor = infer_report_meta(ing["text"])
 
     save_case_mongo({
@@ -87,9 +79,7 @@ async def run_pipeline(file_bytes: bytes, mime: str, user_id: str | None = None)
         "panels_path": panels_path
     })
 
-    # -----------------------------
-    # 7) Return minimal state
-    # -----------------------------
+ 
     return {
         "case_id": case_id,
         "panels": panels,
