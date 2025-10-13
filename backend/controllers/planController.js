@@ -20,11 +20,11 @@ const calculatePlanDates = (planType) => {
 
     case "PremiumCare":
       expireDate = new Date(now);
-      expireDate.setFullYear(expireDate.getFullYear() + 1); // valid 1 year
+      expireDate.setMonth(expireDate.getMonth() + 1); // valid 1 month
       deleteDate = new Date(expireDate);
-      deleteDate.setDate(deleteDate.getDate() + 2);
+      deleteDate.setDate(deleteDate.getDate() + 5); // delete data after +2 days
       break;
-
+    
     default:
       expireDate = null;
       deleteDate = null;
