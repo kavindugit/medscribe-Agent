@@ -4,11 +4,12 @@ import jwt from 'jsonwebtoken';
 import userModel from '../models/usermodel.js';
 import transporter from '../config/nodemailer.js';
 import {nanoid} from 'nanoid';     // your pre-configured nodemailer transport
+import usageModel from "../models/usageModel.js";
+import { getPlanLimits } from "../config/planConfig.js";
 
 export const register = async (req, res) => {
-  const { fullName, nic, email, phoneNo, address, password, gender, dob, role } = req.body;
+  const { fullName, nic, email, phoneNo, address, password, gender, dob } = req.body;
 
-  
   if (!fullName || !email || !password) {
     return res.status(400).json({ success: false, message: "Full name, email, and password are required." });
   }
@@ -24,11 +25,11 @@ export const register = async (req, res) => {
   }
 
   try {
-
     const existingByEmail = await userModel.findOne({ email: email.toLowerCase() });
     if (existingByEmail) {
       return res.status(409).json({ success: false, message: "An account with this email already exists." });
     }
+
     const existingByNic = await userModel.findOne({ nic });
     if (existingByNic) {
       return res.status(409).json({ success: false, message: "An account with this NIC already exists." });
@@ -37,6 +38,10 @@ export const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = nanoid(12);
 
+    // Default plan = Free
+    const plan = "Free";
+
+    // Create user
     const newUser = await userModel.create({
       userId,
       fullName,
@@ -48,42 +53,53 @@ export const register = async (req, res) => {
       dob,
       password: hashedPassword,
       role: "patient",
+      plan,
       status: "Active",
-      isVerified: true, 
+      isVerified: true,
     });
 
-    const token = jwt.sign(
-      { sub: newUser.userId, role: newUser.role },  // use 'sub' for subject
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }                       // short access token; add refresh endpoint later
+    // Initialize usage record
+    const planLimits = getPlanLimits(plan);
+
+    await usageModel.updateOne(
+      { userId },
+      {
+        $setOnInsert: {
+          reportsUploaded: 0,
+          agentCalls: 0,
+          lastReset: new Date(),
+          planReportsLimit: planLimits.reports,
+          planAgentsLimit: planLimits.agents,
+        },
+      },
+      { upsert: true }
     );
 
-    res.cookie("access_token", token, {
+    const token = jwt.sign({ id: newUser.userId, role: newUser.role }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 15 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
+    // Send welcome email
     const mailOptions = {
       from: process.env.SENDER_EMAIL,
       to: newUser.email,
       subject: "Welcome to MedReport Assist 👋",
-      text:
-`Hello ${fullName},
+      text: `Hello ${fullName},
 
 Welcome to MedReport Assist!
 
-You can securely upload medical reports, get plain-language translations of medical terms, generate accurate summaries with citations, and chat with our agent for educational guidance. 
+You can securely upload medical reports, get plain-language translations of medical terms, generate accurate summaries, and chat with our health assistant.
 
-What you can do next:
-• Upload your first report and track processing status.
-• Try the Medical Term Translator to simplify jargon.
-• View summaries with sources and discuss with your clinician.
+Start by uploading your first report and exploring your dashboard.
 
-If you didn’t create this account, contact support immediately.
-
-— The MedReport Assist Team`
+– The MedReport Assist Team`,
     };
 
     transporter.sendMail(mailOptions).catch((err) => {
@@ -98,9 +114,8 @@ If you didn’t create this account, contact support immediately.
         fullName: newUser.fullName,
         email: newUser.email,
         role: newUser.role,
-        status: newUser.status,
+        plan: newUser.plan,
       },
-     
     });
   } catch (error) {
     console.error("Error during registration:", error);

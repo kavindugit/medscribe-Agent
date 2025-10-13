@@ -13,18 +13,28 @@ import {
   LogOut,
   Settings,
   User,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { backendUrl, userData } = useContext(AppContent);
-  const backend_AI = "http://localhost:8001";
+  const { backendUrl, userData, getUserData, usage } = useContext(AppContent);
+  const backend_AI = "http://localhost:8001"; // FastAPI service
 
-  // File upload state
+  // debug: see plan + remaining in console when available
+  useEffect(() => {
+    if (userData && usage) {
+      console.log("🧍 User Plan:", userData.plan);
+      console.log("📊 Remaining Reports:", usage.remainingReports);
+    }
+  }, [userData, usage]);
+
+  // Upload + processing state
   const [file, setFile] = useState(null);
   const [caseId, setCaseId] = useState("");
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
 
   // Agent outputs
   const [summaryOutput, setSummaryOutput] = useState("");
@@ -47,10 +57,16 @@ export default function HomePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Upload handler
+  // 🚀 Upload Handler
   const onUpload = async () => {
-    if (!file) return alert("Pick a PDF or image");
-    if (!userData?.userId) return alert("Not logged in");
+    if (!file) return alert("Please select a PDF or image file.");
+    if (!userData?.userId) return alert("Please log in first.");
+
+    // client-side guard using context usage
+    if (usage?.remainingReports === 0) {
+      setLimitReached(true);
+      return;
+    }
 
     const form = new FormData();
     form.append("file", file);
@@ -59,36 +75,46 @@ export default function HomePage() {
       setUploading(true);
       setError("");
 
-      // 1️⃣ Upload the file -> get caseId
+      // 1) Upload the file → create case in backend
       const { data } = await axios.post(`${backendUrl}/api/cases`, form, {
         withCredentials: true,
         headers: { "X-User-Id": userData.userId },
       });
+
+      if (!data || !data.case_id) throw new Error("Invalid response from server.");
+
       setCaseId(data.case_id);
 
-      // Clear chosen file after upload
-      setFile(null);
-      document.getElementById("reportUpload").value = "";
-
-      // 2️⃣ Fetch cleaned report text
+      // 2) Fetch cleaned report text
       const cleaned = await axios.get(
         `${backendUrl}/api/cases/${data.case_id}/cleaned`,
-        { withCredentials: true, headers: { "X-User-Id": userData.userId } }
+        {
+          withCredentials: true,
+          headers: { "X-User-Id": userData.userId },
+        }
       );
       const cleanedText = cleaned.data.cleaned_text;
-      console.log("Cleaned text:", cleanedText);
 
-      // 3️⃣ Run pipeline with streaming
-      runPipeline(cleanedText);
+      // 3) Run pipeline using cleaned text
+      await runPipeline(cleanedText);
+
+      // Clear the file input
+      setFile(null);
+      document.getElementById("reportUpload").value = "";
     } catch (err) {
-      console.error(err?.response?.data || err.message);
-      setError("⚠️ Upload failed. Please try again.");
+      console.error("❌ Upload Error:", err?.response?.data || err.message);
+      if (err?.response?.status === 403) {
+        // backend checkPlanLimit blocked it
+        setLimitReached(true);
+      } else {
+        setError("⚠️ Upload failed. Please try again.");
+      }
     } finally {
       setUploading(false);
     }
   };
 
-  // Streaming pipeline runner
+  // 🧠 Streaming pipeline runner
   const runPipeline = async (cleanedText) => {
     try {
       const response = await fetch(`${backend_AI}/pipeline/run`, {
@@ -106,7 +132,6 @@ export default function HomePage() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-
         const events = buffer.split("\n\n");
         buffer = events.pop() || "";
 
@@ -118,7 +143,6 @@ export default function HomePage() {
             const jsonStr = trimmed.startsWith("data:")
               ? trimmed.replace(/^data:\s*/, "")
               : trimmed;
-
             const data = JSON.parse(jsonStr);
 
             switch (data.agent) {
@@ -194,19 +218,18 @@ export default function HomePage() {
     }
   };
 
- 
-const { getUserData } = useContext(AppContent);
+  // 🔒 Logout
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${backendUrl}/api/auth/logout`, {}, { withCredentials: true });
+    } catch (err) {
+      console.warn("Logout failed or already logged out:", err.message);
+    } finally {
+      await getUserData(); // resets context
+      window.location.href = "/login";
+    }
+  };
 
-const handleLogout = async () => {
-  try {
-    await axios.post(`${backendUrl}/api/auth/logout`, {}, { withCredentials: true });
-  } catch (err) {
-    console.warn("Logout failed or already logged out:", err.message);
-  } finally {
-    await getUserData(); // ✅ resets userData in context
-    window.location.href = "/login"; // ✅ hard reload ensures fresh UI
-  }
-};
   return (
     <div className="min-h-screen w-full bg-slate-950 text-white flex flex-col relative">
       <Backdrop />
@@ -222,7 +245,7 @@ const handleLogout = async () => {
           <button onClick={() => navigate("/pricing")}>Pricing</button>
           <button onClick={() => navigate("/chat")}>Chat</button>
 
-          {/* 🚀 Profile dropdown */}
+          {/* Profile dropdown */}
           <div className="relative">
             <button
               onClick={() => setDropdownOpen((prev) => !prev)}
@@ -270,9 +293,7 @@ const handleLogout = async () => {
         <section className="text-center">
           <h1 className="text-3xl font-bold">
             Welcome back,{" "}
-            <span className="text-cyan-400">
-              {userData?.name || "Guest"}
-            </span>
+            <span className="text-cyan-400">{userData?.name || "Guest"}</span>
           </h1>
           <p className="text-sm text-neutral-400 mt-1">
             Your role: {userData?.role || "Patient"}
@@ -280,40 +301,61 @@ const handleLogout = async () => {
         </section>
 
         {/* Upload */}
-        <section className="relative rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center hover:shadow-xl transition-all overflow-hidden">
+        <section className="relative rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center overflow-hidden">
           {uploading && (
             <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400 animate-[progress_2s_linear_infinite]" />
           )}
 
-          <FileUp
-            className={`mx-auto h-12 w-12 ${
-              uploading ? "text-emerald-400 animate-spin" : "text-cyan-400 animate-bounce"
-            }`}
-          />
-          <p className="mt-2 text-sm text-neutral-300">
-            Drag & drop your medical report or select below
-          </p>
-          <input
-            id="reportUpload"
-            type="file"
-            accept="application/pdf,image/*"
-            onChange={(e) => setFile(e.target.files?.[0])}
-            className="mt-4 block w-full text-sm text-neutral-300"
-            disabled={uploading}
-          />
-          <button
-            onClick={onUpload}
-            disabled={uploading || !file}
-            className="mt-4 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-6 py-2 text-sm font-semibold text-black hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {uploading ? "⏳ Uploading..." : "Upload"}
-          </button>
-          {error && <p className="mt-2 text-red-400 text-sm">{error}</p>}
-          {caseId && !error && (
-            <p className="mt-3 text-green-400 text-sm">
-              ✅ Uploaded • Case ID:{" "}
-              <span className="text-cyan-400">{caseId}</span>
-            </p>
+          {/* Limit reached message */}
+          {limitReached ? (
+            <div className="p-6 text-center space-y-4">
+              <AlertTriangle className="mx-auto h-12 w-12 text-yellow-400 animate-pulse" />
+              <h2 className="text-xl font-semibold text-yellow-300">
+                🚫 Free Plan Limit Reached
+              </h2>
+              <p className="text-sm text-neutral-300">
+                You’ve used all your <span className="text-cyan-400">Free</span> uploads.
+                Upgrade to unlock more reports and premium features!
+              </p>
+              <button
+                onClick={() => navigate("/pricing")}
+                className="mt-2 px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold hover:scale-105 shadow-lg transition"
+              >
+                🚀 Upgrade Now
+              </button>
+            </div>
+          ) : (
+            <>
+              <FileUp
+                className={`mx-auto h-12 w-12 ${
+                  uploading ? "text-emerald-400 animate-spin" : "text-cyan-400 animate-bounce"
+                }`}
+              />
+              <p className="mt-2 text-sm text-neutral-300">
+                Drag & drop your medical report or select below
+              </p>
+              <input
+                id="reportUpload"
+                type="file"
+                accept="application/pdf,image/*"
+                onChange={(e) => setFile(e.target.files?.[0])}
+                className="mt-4 block w-full text-sm text-neutral-300"
+                disabled={uploading}
+              />
+              <button
+                onClick={onUpload}
+                disabled={uploading || !file}
+                className="mt-4 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-6 py-2 text-sm font-semibold text-black hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploading ? "⏳ Uploading..." : "Upload"}
+              </button>
+              {error && <p className="mt-2 text-red-400 text-sm">{error}</p>}
+              {caseId && !error && (
+                <p className="mt-3 text-green-400 text-sm">
+                  ✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span>
+                </p>
+              )}
+            </>
           )}
         </section>
 
