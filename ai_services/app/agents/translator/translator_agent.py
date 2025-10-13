@@ -23,8 +23,6 @@ model = init_chat_model("gemini-2.5-flash", model_provider="google_genai")
 
 class TranslationResult(BaseModel):
     translation: str
-    sources: list[str]
-    tools_used: list[str]
 
 # Initialize Pydantic parser
 parser = PydanticOutputParser(pydantic_object=TranslationResult)
@@ -89,4 +87,4 @@ def translate_report(medical_report: str):
     response = parser.parse(raw_response["output"])
 
     # Return the summary, sources, and tools used
-    return response.translation, response.sources, response.tools_used
+    return response.translation

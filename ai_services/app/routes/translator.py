@@ -24,7 +24,7 @@ async def translate_medical_report(file: UploadFile = File(...)):
     
     # Get the tranlation using the summarizer logic
     try:
-        tranlation, sources, tools_used = translate_report(medical_report)
+        tranlation = translate_report(medical_report)
     except ValueError as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
@@ -34,6 +34,5 @@ async def translate_medical_report(file: UploadFile = File(...)):
     # Return the tranlation in the response
     return {
         "tranlation": tranlation,
-        "sources": sources,
-        "tools_used": tools_used,
+       
     }
