@@ -1,26 +1,31 @@
 import userModel from "../models/usermodel.js";
+import usageModel from "../models/usageModel.js";
+import { PLAN_LIMITS, getPlanLimits } from "../config/planConfig.js";
 
-// 🔹 Helper function to calculate expiry and deletion dates
+/* -------------------------
+   🔹 Utility: calculate expiry + deletion dates
+-------------------------- */
 const calculatePlanDates = (planType) => {
   const now = new Date();
-  let expireDate = new Date(now);
-  let deleteDate = new Date(now);
+  let expireDate = null;
+  let deleteDate = null;
 
-  // Define durations for plans
   switch (planType) {
     case "HealthPro":
-      expireDate.setMonth(expireDate.getMonth() + 1); // 1 month validity
+      expireDate = new Date(now);
+      expireDate.setMonth(expireDate.getMonth() + 1); // valid 1 month
       deleteDate = new Date(expireDate);
-      deleteDate.setDate(deleteDate.getDate() + 2); // delete data after 2 days of expiry
+      deleteDate.setDate(deleteDate.getDate() + 2); // delete data after +2 days
       break;
 
     case "PremiumCare":
-      expireDate.setFullYear(expireDate.getFullYear() + 1); // 1-year validity
+      expireDate = new Date(now);
+      expireDate.setFullYear(expireDate.getFullYear() + 1); // valid 1 year
       deleteDate = new Date(expireDate);
       deleteDate.setDate(deleteDate.getDate() + 2);
       break;
 
-    default: // Free plan
+    default:
       expireDate = null;
       deleteDate = null;
       break;
@@ -29,43 +34,70 @@ const calculatePlanDates = (planType) => {
   return { expireDate, deleteDate };
 };
 
-// 🔹 Controller to handle plan update (after payment or manual upgrade)
+/* -------------------------
+   🔹 Helper: Sync usage record when plan changes
+-------------------------- */
+const syncUsageWithPlan = async (userId, planType) => {
+  const limits = getPlanLimits(planType);
+  let usage = await usageModel.findOne({ userId });
+
+  // Create if missing
+  if (!usage) {
+    usage = await usageModel.create({
+      userId,
+      reportsUploaded: 0,
+      agentCalls: 0,
+      lastReset: new Date(),
+    });
+  }
+
+  // Reset counts on plan change
+  usage.reportsUploaded = 0;
+  usage.agentCalls = 0;
+  usage.lastReset = new Date();
+  await usage.save();
+
+  return { usage, limits };
+};
+
+/* -------------------------
+   🔹 Controller: Manual or Payment-Based Plan Update
+-------------------------- */
 export const updateUserPlan = async (req, res) => {
   try {
     const { userId, planType, paymentStatus } = req.body;
 
-    if (!userId || !planType) {
+    if (!userId || !planType)
       return res.json({ success: false, message: "User ID and plan type are required." });
-    }
 
-    // For now, allow dummy payment verification
-    if (paymentStatus !== "success") {
+    if (paymentStatus && paymentStatus !== "success")
       return res.json({ success: false, message: "Payment not completed or failed." });
-    }
 
     const user = await userModel.findOne({ userId });
+    if (!user) return res.json({ success: false, message: "User not found." });
 
-    if (!user) {
-      return res.json({ success: false, message: "User not found." });
-    }
-
-    // Calculate plan dates
     const { expireDate, deleteDate } = calculatePlanDates(planType);
 
-    // Update user's plan info
     user.plan = planType;
     user.planExpireAt = expireDate;
     user.deleteDataAt = deleteDate;
-
     await user.save();
 
-    res.json({
+    // 🔹 Sync usage record
+    const { usage } = await syncUsageWithPlan(userId, planType);
+
+    return res.json({
       success: true,
       message: `Plan updated successfully to ${planType}`,
-      updatedPlan: {
+      user: {
+        userId: user.userId,
         plan: user.plan,
         planExpireAt: user.planExpireAt,
         deleteDataAt: user.deleteDataAt,
+      },
+      usage: {
+        reportsUploaded: usage.reportsUploaded,
+        agentCalls: usage.agentCalls,
       },
     });
   } catch (error) {
@@ -74,19 +106,18 @@ export const updateUserPlan = async (req, res) => {
   }
 };
 
-// 🔹 Controller to simulate payment (dummy gateway for testing)
+/* -------------------------
+   🔹 Simulated Payment Endpoint (for testing)
+-------------------------- */
 export const simulatePayment = async (req, res) => {
   try {
     const { userId, planType } = req.body;
 
-    if (!userId || !planType) {
+    if (!userId || !planType)
       return res.json({ success: false, message: "User ID and plan type are required." });
-    }
 
-    // Simulate a successful payment process
     console.log(`💳 Simulating payment for ${userId}, plan: ${planType}`);
 
-    // Automatically mark as paid and call updateUserPlan internally
     const { expireDate, deleteDate } = calculatePlanDates(planType);
 
     const updatedUser = await userModel.findOneAndUpdate(
@@ -99,9 +130,11 @@ export const simulatePayment = async (req, res) => {
       { new: true }
     );
 
-    if (!updatedUser) {
+    if (!updatedUser)
       return res.json({ success: false, message: "User not found." });
-    }
+
+    // 🔹 Sync usage after plan upgrade
+    const { usage } = await syncUsageWithPlan(userId, planType);
 
     return res.json({
       success: true,
@@ -112,6 +145,7 @@ export const simulatePayment = async (req, res) => {
         planExpireAt: updatedUser.planExpireAt,
         deleteDataAt: updatedUser.deleteDataAt,
       },
+      usage,
     });
   } catch (error) {
     console.error("Error simulating payment:", error);
@@ -119,7 +153,9 @@ export const simulatePayment = async (req, res) => {
   }
 };
 
-// 🔹 Controller to downgrade user plan automatically after expiry (for CRON job or manual)
+/* -------------------------
+   🔹 Auto Downgrade Expired Plans (CRON / Manual)
+-------------------------- */
 export const downgradeExpiredPlans = async (req, res) => {
   try {
     const now = new Date();
@@ -129,15 +165,16 @@ export const downgradeExpiredPlans = async (req, res) => {
       plan: { $ne: "Free" },
     });
 
-    if (expiredUsers.length === 0) {
+    if (!expiredUsers.length)
       return res.json({ success: true, message: "No expired plans found." });
-    }
 
     for (let user of expiredUsers) {
       user.plan = "Free";
       user.planExpireAt = null;
       user.deleteDataAt = null;
       await user.save();
+
+      await syncUsageWithPlan(user.userId, "Free");
     }
 
     res.json({

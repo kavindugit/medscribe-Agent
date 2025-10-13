@@ -5,12 +5,12 @@ export const PLAN_LIMITS = {
     agents: 15,
     description: "Basic free access — up to 3 reports per month",
   },
-  "Health Pro": {
+  "HealthPro": {
     reports: 10,
     agents: 50,
     description: "Mid-tier plan with more report and agent usage",
   },
-  "Premium Care": {
+  "PremiumCare": {
     reports: Infinity,
     agents: Infinity,
     description: "Unlimited usage — full access to all features",

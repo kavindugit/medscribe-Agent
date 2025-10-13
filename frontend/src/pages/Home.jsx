@@ -1,3 +1,4 @@
+// frontend/src/pages/HomePage.jsx
 import React, { useContext, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -12,21 +13,28 @@ import {
   LogOut,
   Settings,
   User,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { backendUrl, userData, getUserData , usage } = useContext(AppContent);
-  const backend_AI = "http://localhost:8001"; // your FastAPI service
+  const { backendUrl, userData, getUserData, usage } = useContext(AppContent);
+  const backend_AI = "http://localhost:8001"; // FastAPI service
 
-  console.log(userData.plan);
-  console.log(usage.remainingReports);
+  // debug: see plan + remaining in console when available
+  useEffect(() => {
+    if (userData && usage) {
+      console.log("🧍 User Plan:", userData.plan);
+      console.log("📊 Remaining Reports:", usage.remainingReports);
+    }
+  }, [userData, usage]);
 
   // Upload + processing state
   const [file, setFile] = useState(null);
   const [caseId, setCaseId] = useState("");
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
 
   // Agent outputs
   const [summaryOutput, setSummaryOutput] = useState("");
@@ -44,7 +52,6 @@ export default function HomePage() {
   // Profile dropdown
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-
   // Auto-scroll chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -55,6 +62,12 @@ export default function HomePage() {
     if (!file) return alert("Please select a PDF or image file.");
     if (!userData?.userId) return alert("Please log in first.");
 
+    // client-side guard using context usage
+    if (usage?.remainingReports === 0) {
+      setLimitReached(true);
+      return;
+    }
+
     const form = new FormData();
     form.append("file", file);
 
@@ -62,19 +75,17 @@ export default function HomePage() {
       setUploading(true);
       setError("");
 
-      // Step 1️⃣ Upload the file → create case in backend
+      // 1) Upload the file → create case in backend
       const { data } = await axios.post(`${backendUrl}/api/cases`, form, {
         withCredentials: true,
         headers: { "X-User-Id": userData.userId },
       });
 
-      if (!data || !data.case_id)
-        throw new Error("Invalid response from server.");
+      if (!data || !data.case_id) throw new Error("Invalid response from server.");
 
       setCaseId(data.case_id);
-      console.log("✅ Case created:", data.case_id);
 
-      // Step 2️⃣ Fetch cleaned report text
+      // 2) Fetch cleaned report text
       const cleaned = await axios.get(
         `${backendUrl}/api/cases/${data.case_id}/cleaned`,
         {
@@ -83,9 +94,8 @@ export default function HomePage() {
         }
       );
       const cleanedText = cleaned.data.cleaned_text;
-      console.log("🧹 Cleaned text:", cleanedText);
 
-      // Step 3️⃣ Run pipeline using cleaned text
+      // 3) Run pipeline using cleaned text
       await runPipeline(cleanedText);
 
       // Clear the file input
@@ -93,7 +103,12 @@ export default function HomePage() {
       document.getElementById("reportUpload").value = "";
     } catch (err) {
       console.error("❌ Upload Error:", err?.response?.data || err.message);
-      setError("⚠️ Upload failed. Please try again.");
+      if (err?.response?.status === 403) {
+        // backend checkPlanLimit blocked it
+        setLimitReached(true);
+      } else {
+        setError("⚠️ Upload failed. Please try again.");
+      }
     } finally {
       setUploading(false);
     }
@@ -155,19 +170,19 @@ export default function HomePage() {
                 setAdviceOutput(data.output);
                 break;
               default:
-                console.warn("⚠️ Unknown agent event:", data);
+                console.warn("Unknown agent:", data);
             }
           } catch (err) {
-            console.error("Failed to parse JSON chunk:", evt, err);
+            console.error("❌ Failed to parse JSON:", evt, err);
           }
         }
       }
     } catch (err) {
-      console.error("Pipeline stream error:", err);
+      console.error("Pipeline error:", err);
     }
   };
 
-  // 💬 Chat functions
+  // Chat send
   const handleSend = async () => {
     if (!input.trim()) return;
     const userMessage = { role: "user", content: input };
@@ -210,8 +225,8 @@ export default function HomePage() {
     } catch (err) {
       console.warn("Logout failed or already logged out:", err.message);
     } finally {
-      await getUserData();
-      window.location.href = "/login"; // force reload
+      await getUserData(); // resets context
+      window.location.href = "/login";
     }
   };
 
@@ -230,7 +245,7 @@ export default function HomePage() {
           <button onClick={() => navigate("/pricing")}>Pricing</button>
           <button onClick={() => navigate("/chat")}>Chat</button>
 
-          {/* Profile Dropdown */}
+          {/* Profile dropdown */}
           <div className="relative">
             <button
               onClick={() => setDropdownOpen((prev) => !prev)}
@@ -272,7 +287,7 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Main Content */}
+      {/* Main */}
       <main className="flex-1 p-6 space-y-10 max-w-7xl mx-auto w-full">
         {/* Welcome */}
         <section className="text-center">
@@ -285,40 +300,62 @@ export default function HomePage() {
           </p>
         </section>
 
-        {/* Upload Section */}
-        <section className="relative rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center hover:shadow-xl transition-all overflow-hidden">
+        {/* Upload */}
+        <section className="relative rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center overflow-hidden">
           {uploading && (
             <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400 animate-[progress_2s_linear_infinite]" />
           )}
 
-          <FileUp
-            className={`mx-auto h-12 w-12 ${
-              uploading ? "text-emerald-400 animate-spin" : "text-cyan-400 animate-bounce"
-            }`}
-          />
-          <p className="mt-2 text-sm text-neutral-300">
-            Drag & drop your medical report or select below
-          </p>
-          <input
-            id="reportUpload"
-            type="file"
-            accept="application/pdf,image/*"
-            onChange={(e) => setFile(e.target.files?.[0])}
-            className="mt-4 block w-full text-sm text-neutral-300"
-            disabled={uploading}
-          />
-          <button
-            onClick={onUpload}
-            disabled={uploading || !file}
-            className="mt-4 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-6 py-2 text-sm font-semibold text-black hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {uploading ? "⏳ Uploading..." : "Upload"}
-          </button>
-          {error && <p className="mt-2 text-red-400 text-sm">{error}</p>}
-          {caseId && !error && (
-            <p className="mt-3 text-green-400 text-sm">
-              ✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span>
-            </p>
+          {/* Limit reached message */}
+          {limitReached ? (
+            <div className="p-6 text-center space-y-4">
+              <AlertTriangle className="mx-auto h-12 w-12 text-yellow-400 animate-pulse" />
+              <h2 className="text-xl font-semibold text-yellow-300">
+                🚫 Free Plan Limit Reached
+              </h2>
+              <p className="text-sm text-neutral-300">
+                You’ve used all your <span className="text-cyan-400">Free</span> uploads.
+                Upgrade to unlock more reports and premium features!
+              </p>
+              <button
+                onClick={() => navigate("/pricing")}
+                className="mt-2 px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold hover:scale-105 shadow-lg transition"
+              >
+                🚀 Upgrade Now
+              </button>
+            </div>
+          ) : (
+            <>
+              <FileUp
+                className={`mx-auto h-12 w-12 ${
+                  uploading ? "text-emerald-400 animate-spin" : "text-cyan-400 animate-bounce"
+                }`}
+              />
+              <p className="mt-2 text-sm text-neutral-300">
+                Drag & drop your medical report or select below
+              </p>
+              <input
+                id="reportUpload"
+                type="file"
+                accept="application/pdf,image/*"
+                onChange={(e) => setFile(e.target.files?.[0])}
+                className="mt-4 block w-full text-sm text-neutral-300"
+                disabled={uploading}
+              />
+              <button
+                onClick={onUpload}
+                disabled={uploading || !file}
+                className="mt-4 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-6 py-2 text-sm font-semibold text-black hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploading ? "⏳ Uploading..." : "Upload"}
+              </button>
+              {error && <p className="mt-2 text-red-400 text-sm">{error}</p>}
+              {caseId && !error && (
+                <p className="mt-3 text-green-400 text-sm">
+                  ✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span>
+                </p>
+              )}
+            </>
           )}
         </section>
 
@@ -333,7 +370,7 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* Chatbot Section */}
+        {/* Chatbot */}
         <section className="flex flex-col h-[500px] border border-white/10 rounded-2xl overflow-hidden">
           <header className="p-4 border-b border-white/10 flex items-center gap-2 bg-white/5">
             <MessageSquare className="text-cyan-400" />
@@ -401,7 +438,7 @@ export default function HomePage() {
   );
 }
 
-// Agent Panel
+// Agent output panel
 function AgentPanel({ title, icon, content }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col hover:scale-[1.02] transition">
@@ -416,7 +453,7 @@ function AgentPanel({ title, icon, content }) {
   );
 }
 
-// Animated Background
+// Background
 function Backdrop() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-40">
