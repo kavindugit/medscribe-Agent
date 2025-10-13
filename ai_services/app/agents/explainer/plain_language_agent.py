@@ -22,8 +22,6 @@ model = init_chat_model("gemini-2.0-flash-exp", model_provider="google_genai")
 # Updated Pydantic model to match the actual output format
 class PlainLanguageResult(BaseModel):
     explanation: Dict[str, str]  # Changed from str to Dict[str, str]
-    sources: List[str]
-    tools_used: List[str]
 
 parser = PydanticOutputParser(pydantic_object=PlainLanguageResult)
 
@@ -75,7 +73,7 @@ def process_medical_report(medical_report: str):
         # Parse the response
         parsed_response = parser.parse(response.content)
         
-        return parsed_response.explanation, parsed_response.sources, parsed_response.tools_used
+        return parsed_response.explanation
         
     except Exception as e:
         raise ValueError(f"Error processing medical report: {str(e)}")
