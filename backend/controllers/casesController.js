@@ -18,9 +18,10 @@ export const createCase = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "Please attach a file under 'file'." });
     }
-    const userId = getUserIdFromReq(req);
 
-    // Rebuild multipart form for FastAPI
+    const userId = req.user?.userId || req.get("X-User-Id") || "anon";
+
+    // 1️⃣ Upload to FastAPI ingest
     const form = new FormData();
     form.append("file", req.file.buffer, {
       filename: req.file.originalname || "upload.pdf",
@@ -28,15 +29,17 @@ export const createCase = async (req, res) => {
     });
 
     const r = await ai.post("/ingest/process", form, {
-      headers: {
-        ...form.getHeaders(),
-        "X-User-Id": userId,
-      },
+      headers: { ...form.getHeaders(), "X-User-Id": userId },
       validateStatus: () => true,
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity,
       timeout: 60_000,
     });
+
+    // 2️⃣ Update usage counts (1 report = 5 agents)
+    if (req.userUsage) {
+      req.userUsage.reportsUploaded += 1;
+      req.userUsage.agentCalls += 5;
+      await req.userUsage.save();
+    }
 
     return res.status(r.status).json(r.data);
   } catch (err) {

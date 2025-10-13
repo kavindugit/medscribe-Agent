@@ -1,4 +1,3 @@
-// frontend/src/pages/HomePage.jsx
 import React, { useContext, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -17,10 +16,13 @@ import {
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { backendUrl, userData } = useContext(AppContent);
-  const backend_AI = "http://localhost:8001";
+  const { backendUrl, userData, getUserData , usage } = useContext(AppContent);
+  const backend_AI = "http://localhost:8001"; // your FastAPI service
 
-  // File upload state
+  console.log(userData.plan);
+  console.log(usage.remainingReports);
+
+  // Upload + processing state
   const [file, setFile] = useState(null);
   const [caseId, setCaseId] = useState("");
   const [error, setError] = useState("");
@@ -42,15 +44,16 @@ export default function HomePage() {
   // Profile dropdown
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
+
   // Auto-scroll chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Upload handler
+  // 🚀 Upload Handler
   const onUpload = async () => {
-    if (!file) return alert("Pick a PDF or image");
-    if (!userData?.userId) return alert("Not logged in");
+    if (!file) return alert("Please select a PDF or image file.");
+    if (!userData?.userId) return alert("Please log in first.");
 
     const form = new FormData();
     form.append("file", file);
@@ -59,36 +62,44 @@ export default function HomePage() {
       setUploading(true);
       setError("");
 
-      // 1️⃣ Upload the file -> get caseId
+      // Step 1️⃣ Upload the file → create case in backend
       const { data } = await axios.post(`${backendUrl}/api/cases`, form, {
         withCredentials: true,
         headers: { "X-User-Id": userData.userId },
       });
+
+      if (!data || !data.case_id)
+        throw new Error("Invalid response from server.");
+
       setCaseId(data.case_id);
+      console.log("✅ Case created:", data.case_id);
 
-      // Clear chosen file after upload
-      setFile(null);
-      document.getElementById("reportUpload").value = "";
-
-      // 2️⃣ Fetch cleaned report text
+      // Step 2️⃣ Fetch cleaned report text
       const cleaned = await axios.get(
         `${backendUrl}/api/cases/${data.case_id}/cleaned`,
-        { withCredentials: true, headers: { "X-User-Id": userData.userId } }
+        {
+          withCredentials: true,
+          headers: { "X-User-Id": userData.userId },
+        }
       );
       const cleanedText = cleaned.data.cleaned_text;
-      console.log("Cleaned text:", cleanedText);
+      console.log("🧹 Cleaned text:", cleanedText);
 
-      // 3️⃣ Run pipeline with streaming
-      runPipeline(cleanedText);
+      // Step 3️⃣ Run pipeline using cleaned text
+      await runPipeline(cleanedText);
+
+      // Clear the file input
+      setFile(null);
+      document.getElementById("reportUpload").value = "";
     } catch (err) {
-      console.error(err?.response?.data || err.message);
+      console.error("❌ Upload Error:", err?.response?.data || err.message);
       setError("⚠️ Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
   };
 
-  // Streaming pipeline runner
+  // 🧠 Streaming pipeline runner
   const runPipeline = async (cleanedText) => {
     try {
       const response = await fetch(`${backend_AI}/pipeline/run`, {
@@ -106,7 +117,6 @@ export default function HomePage() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-
         const events = buffer.split("\n\n");
         buffer = events.pop() || "";
 
@@ -118,7 +128,6 @@ export default function HomePage() {
             const jsonStr = trimmed.startsWith("data:")
               ? trimmed.replace(/^data:\s*/, "")
               : trimmed;
-
             const data = JSON.parse(jsonStr);
 
             switch (data.agent) {
@@ -146,19 +155,19 @@ export default function HomePage() {
                 setAdviceOutput(data.output);
                 break;
               default:
-                console.warn("Unknown agent:", data);
+                console.warn("⚠️ Unknown agent event:", data);
             }
           } catch (err) {
-            console.error("❌ Failed to parse JSON:", evt, err);
+            console.error("Failed to parse JSON chunk:", evt, err);
           }
         }
       }
     } catch (err) {
-      console.error("Pipeline error:", err);
+      console.error("Pipeline stream error:", err);
     }
   };
 
-  // Chat send
+  // 💬 Chat functions
   const handleSend = async () => {
     if (!input.trim()) return;
     const userMessage = { role: "user", content: input };
@@ -194,19 +203,18 @@ export default function HomePage() {
     }
   };
 
- 
-const { getUserData } = useContext(AppContent);
+  // 🔒 Logout
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${backendUrl}/api/auth/logout`, {}, { withCredentials: true });
+    } catch (err) {
+      console.warn("Logout failed or already logged out:", err.message);
+    } finally {
+      await getUserData();
+      window.location.href = "/login"; // force reload
+    }
+  };
 
-const handleLogout = async () => {
-  try {
-    await axios.post(`${backendUrl}/api/auth/logout`, {}, { withCredentials: true });
-  } catch (err) {
-    console.warn("Logout failed or already logged out:", err.message);
-  } finally {
-    await getUserData(); // ✅ resets userData in context
-    window.location.href = "/login"; // ✅ hard reload ensures fresh UI
-  }
-};
   return (
     <div className="min-h-screen w-full bg-slate-950 text-white flex flex-col relative">
       <Backdrop />
@@ -222,7 +230,7 @@ const handleLogout = async () => {
           <button onClick={() => navigate("/pricing")}>Pricing</button>
           <button onClick={() => navigate("/chat")}>Chat</button>
 
-          {/* 🚀 Profile dropdown */}
+          {/* Profile Dropdown */}
           <div className="relative">
             <button
               onClick={() => setDropdownOpen((prev) => !prev)}
@@ -264,22 +272,20 @@ const handleLogout = async () => {
         </div>
       </nav>
 
-      {/* Main */}
+      {/* Main Content */}
       <main className="flex-1 p-6 space-y-10 max-w-7xl mx-auto w-full">
         {/* Welcome */}
         <section className="text-center">
           <h1 className="text-3xl font-bold">
             Welcome back,{" "}
-            <span className="text-cyan-400">
-              {userData?.name || "Guest"}
-            </span>
+            <span className="text-cyan-400">{userData?.name || "Guest"}</span>
           </h1>
           <p className="text-sm text-neutral-400 mt-1">
             Your role: {userData?.role || "Patient"}
           </p>
         </section>
 
-        {/* Upload */}
+        {/* Upload Section */}
         <section className="relative rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center hover:shadow-xl transition-all overflow-hidden">
           {uploading && (
             <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400 animate-[progress_2s_linear_infinite]" />
@@ -311,8 +317,7 @@ const handleLogout = async () => {
           {error && <p className="mt-2 text-red-400 text-sm">{error}</p>}
           {caseId && !error && (
             <p className="mt-3 text-green-400 text-sm">
-              ✅ Uploaded • Case ID:{" "}
-              <span className="text-cyan-400">{caseId}</span>
+              ✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span>
             </p>
           )}
         </section>
@@ -328,7 +333,7 @@ const handleLogout = async () => {
           </section>
         )}
 
-        {/* Chatbot */}
+        {/* Chatbot Section */}
         <section className="flex flex-col h-[500px] border border-white/10 rounded-2xl overflow-hidden">
           <header className="p-4 border-b border-white/10 flex items-center gap-2 bg-white/5">
             <MessageSquare className="text-cyan-400" />
@@ -396,7 +401,7 @@ const handleLogout = async () => {
   );
 }
 
-// Agent output panel
+// Agent Panel
 function AgentPanel({ title, icon, content }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col hover:scale-[1.02] transition">
@@ -411,7 +416,7 @@ function AgentPanel({ title, icon, content }) {
   );
 }
 
-// Background
+// Animated Background
 function Backdrop() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-40">

@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from "react"; // ✅ added useEffect
+import { createContext, useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
@@ -9,17 +9,18 @@ export const AppContextProvider = (props) => {
 
   const [isLoggedin, setIsLoggedin] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [usage, setUsage] = useState(null); // ✅ NEW: usage tracking
 
   // ✅ Function to get logged-in user data
   const getUserData = async () => {
     try {
-      const { data } = await axios.get(`http://localhost:4000/api/user/data`, {
+      const { data } = await axios.get(`${backendUrl}/api/user/data`, {
         withCredentials: true,
       });
 
       if (data.success) {
         setUserData(data.userData);
-        setIsLoggedin(true); // ✅ Update login state
+        setIsLoggedin(true);
       } else {
         toast.error(data.message);
         setUserData(null);
@@ -32,9 +33,26 @@ export const AppContextProvider = (props) => {
     }
   };
 
-  // ✅ useEffect to call getUserData when app loads
+  // ✅ Function to get user usage data
+  const getUsage = async () => {
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/usage/stats`, {
+        withCredentials: true,
+      });
+      if (data.success) {
+        setUsage(data.data);
+      } else {
+        console.warn("⚠️ Usage data not found:", data.message);
+      }
+    } catch (err) {
+      console.error("Usage fetch failed:", err.message);
+    }
+  };
+
+  // ✅ Load both user & usage data when app starts
   useEffect(() => {
     getUserData();
+    getUsage();
   }, []);
 
   const value = {
@@ -44,6 +62,8 @@ export const AppContextProvider = (props) => {
     userData,
     setUserData,
     getUserData,
+    usage, // ✅ expose usage data globally
+    getUsage, // ✅ expose function to refresh usage
   };
 
   return (

@@ -1,3 +1,4 @@
+// backend/lib/aiClient.js
 import axios from "axios";
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL;            // e.g. http://127.0.0.1:8001
