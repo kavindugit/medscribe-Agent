@@ -1,4 +1,4 @@
-# app/vector/indexer.py
+# ai_services/app/vector/indexer.py
 import os
 import json
 from qdrant_client import QdrantClient
@@ -136,3 +136,27 @@ def index_case(case_id: str) -> int:
     qdrant.upsert(collection_name=COLLECTION, points=points)
     print(f"✅ Indexed {len(points)} chunks into Qdrant for case {case_id}")
     return len(points)
+
+# -----------------------------
+def delete_case_embeddings(case_id: str) -> int:
+    """
+    Delete all embeddings (points) in Qdrant related to a specific case_id.
+    Returns the number of deleted points.
+    """
+    ensure_collection()
+    try:
+        result = qdrant.delete(
+            collection_name=COLLECTION,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(
+                    must=[models.FieldCondition(
+                        key="case_id",
+                        match=models.MatchValue(value=case_id)
+                    )]
+                )
+            ),
+        )
+        print(f"🗑️ Deleted embeddings for case {case_id}")
+        return result
+    except Exception as e:
+        raise RuntimeError(f"Failed to delete embeddings for {case_id}: {e}")
