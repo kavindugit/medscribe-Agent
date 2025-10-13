@@ -1,5 +1,7 @@
 import userModel from "../models/usermodel.js";
 import usageModel from "../models/usageModel.js";
+import caseModel from "../models/caseModel.js";
+import { ai } from "../lib/aiClient.js"; // ✅ use shared AI client
 import { PLAN_LIMITS, getPlanLimits } from "../config/planConfig.js";
 
 /* -------------------------
@@ -15,16 +17,16 @@ const calculatePlanDates = (planType) => {
       expireDate = new Date(now);
       expireDate.setMonth(expireDate.getMonth() + 1); // valid 1 month
       deleteDate = new Date(expireDate);
-      deleteDate.setDate(deleteDate.getDate() + 2); // delete data after +2 days
+      deleteDate.setDate(deleteDate.getDate() + 2); // cleanup after +2 days
       break;
 
     case "PremiumCare":
       expireDate = new Date(now);
       expireDate.setMonth(expireDate.getMonth() + 1); // valid 1 month
       deleteDate = new Date(expireDate);
-      deleteDate.setDate(deleteDate.getDate() + 5); // delete data after +2 days
+      deleteDate.setDate(deleteDate.getDate() + 5); // cleanup after +5 days
       break;
-    
+
     default:
       expireDate = null;
       deleteDate = null;
@@ -41,7 +43,6 @@ const syncUsageWithPlan = async (userId, planType) => {
   const limits = getPlanLimits(planType);
   let usage = await usageModel.findOne({ userId });
 
-  // Create if missing
   if (!usage) {
     usage = await usageModel.create({
       userId,
@@ -51,7 +52,6 @@ const syncUsageWithPlan = async (userId, planType) => {
     });
   }
 
-  // Reset counts on plan change
   usage.reportsUploaded = 0;
   usage.agentCalls = 0;
   usage.lastReset = new Date();
@@ -83,7 +83,6 @@ export const updateUserPlan = async (req, res) => {
     user.deleteDataAt = deleteDate;
     await user.save();
 
-    // 🔹 Sync usage record
     const { usage } = await syncUsageWithPlan(userId, planType);
 
     return res.json({
@@ -133,7 +132,6 @@ export const simulatePayment = async (req, res) => {
     if (!updatedUser)
       return res.json({ success: false, message: "User not found." });
 
-    // 🔹 Sync usage after plan upgrade
     const { usage } = await syncUsageWithPlan(userId, planType);
 
     return res.json({
@@ -154,44 +152,55 @@ export const simulatePayment = async (req, res) => {
 };
 
 /* -------------------------
-   🔹 Auto Downgrade Expired Plans (CRON / Manual)
--------------------------- */
-/* -------------------------
    🔹 Auto Downgrade Expired Plans + Cleanup DeleteData
 -------------------------- */
 export const downgradeExpiredPlans = async (req, res) => {
   try {
     const now = new Date();
 
-    // 1️⃣ Find users whose plan has expired but not yet downgraded
+    // 1️⃣ Find users whose plan expired (need downgrade)
     const expiredUsers = await userModel.find({
       planExpireAt: { $lte: now },
       plan: { $ne: "Free" },
     });
 
-    // 2️⃣ Find users whose deleteDataAt is due (cleanup stage)
+    // 2️⃣ Find users whose deleteDataAt passed (cleanup stage)
     const cleanupUsers = await userModel.find({
       deleteDataAt: { $lte: now, $ne: null },
     });
 
-    // Downgrade expired plans
+    // 🔸 Step 1: Downgrade expired plans
     for (const user of expiredUsers) {
       console.log(`⚙️ Downgrading ${user.fullName} (${user.userId}) to Free plan`);
 
       user.plan = "Free";
-      // keep deleteDataAt unchanged here
       user.planExpireAt = null;
-
       await user.save();
 
-      // Reset usage limits to Free plan
       await syncUsageWithPlan(user.userId, "Free");
     }
 
-    // Cleanup deleteDataAt
+    // 🔸 Step 2: Cleanup expired data
     for (const user of cleanupUsers) {
       console.log(`🧹 Cleaning expired data for ${user.fullName} (${user.userId})`);
 
+      const userCases = await caseModel.find({ userId: user.userId });
+
+      for (const caseDoc of userCases) {
+        try {
+          // ✅ Delete case files
+          await ai.delete(`/cases/${caseDoc.case_id}/delete-files`);
+          console.log(`🗑️ Deleted case files for ${caseDoc.case_id}`);
+
+          // ✅ Delete vector indexes
+          await ai.delete(`/vector/cleanup/${caseDoc.case_id}`);
+          console.log(`🧠 Deleted vector index for ${caseDoc.case_id}`);
+        } catch (err) {
+          console.warn(`⚠️ Cleanup failed for case ${caseDoc.case_id}: ${err.message}`);
+        }
+      }
+
+      // ✅ Remove deleteDataAt (mark cleanup complete)
       user.deleteDataAt = null;
       await user.save();
     }
@@ -201,7 +210,7 @@ export const downgradeExpiredPlans = async (req, res) => {
 
     return res.json({
       success: true,
-      message: `✅ ${totalDowngraded} plans downgraded, ${totalCleaned} user records cleaned.`,
+      message: `✅ ${totalDowngraded} plans downgraded, ${totalCleaned} user data cleanups completed.`,
     });
   } catch (error) {
     console.error("Error in auto plan downgrade:", error);
