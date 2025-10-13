@@ -1,116 +1,89 @@
-# app/agents/advisor/general_medical_advisor.py
-
+# Import necessary modules
 from langchain.chat_models import init_chat_model
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers import PydanticOutputParser
-import os
-from dotenv import load_dotenv
+from langchain.agents import create_tool_calling_agent
+from langchain.agents import AgentExecutor
 from pydantic import BaseModel
-from typing import List, Dict, Optional
-from datetime import datetime
+import os
+import getpass
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
 load_dotenv()
 
-# Initialize the LangChain model
-model = init_chat_model("gemini-2.0-flash-exp", model_provider="google_genai")
+# Access the GOOGLE_API_KEY environment variable
+google_api_key = os.getenv("GOOGLE_API_KEY")
+# Load environment variables
+if not os.environ.get("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = getpass.getpass("Enter API key for Google Gemini: ")
 
-# Comprehensive Pydantic model for detailed medical recommendations
-class MedicalAdviceResult(BaseModel):
-    clinical_interpretation: str
-    urgency_level: str
-    immediate_actions: List[Dict[str, str]]
-    medication_recommendations: List[Dict[str, str]]
-    lifestyle_modifications: Dict[str, List[str]]
-    diagnostic_follow_up: List[Dict[str, str]]
-    specialist_referrals: List[Dict[str, str]]
-    monitoring_plan: Dict[str, str]
-    patient_education: List[str]
-    potential_complications: List[str]
-    emergency_warning_signs: List[str]
-    expected_timeline: Dict[str, str]
-    evidence_basis: List[str]
+# Initialize the Langchain model
+model = init_chat_model("gemini-2.5-flash", model_provider="google_genai")
 
-parser = PydanticOutputParser(pydantic_object=MedicalAdviceResult)
+class RecommendationResult(BaseModel):
+    recommendations: str
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", 
-     """You are an experienced primary care physician with 20+ years of clinical practice.
-     Provide comprehensive, evidence-based medical recommendations for patients based on their medical reports.
+# Initialize the Pydantic parser
+parser = PydanticOutputParser(pydantic_object=RecommendationResult)
 
-     CRITICAL REQUIREMENTS FOR DEPTH:
-     - Provide SPECIFIC, actionable recommendations with timelines and measurable goals
-     - Include both pharmacological and non-pharmacological management strategies
-     - Reference current clinical guidelines (USPSTF, specialty society guidelines)
-     - Consider patient's complete clinical context, comorbidities, and social determinants
-     - Provide contingency plans for treatment failure or adverse effects
-     - Include specific monitoring parameters and follow-up intervals
+# Define the recommendation prompt template
+recommendation_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", 
+         "You are an AI trained to provide expert recommendations based on the content of medical reports. "
+         "Your task is to carefully analyze the provided content and offer professional advice or recommendations based on the report's findings.\n\n"
+         "Guidelines:\n"
+         "1. Analyze the medical report carefully and provide actionable recommendations or insights.\n"
+         "2. Your recommendations should be based strictly on the content of the report, without making any assumptions.\n"
+         "3. If the report lacks details or contains ambiguous sections, acknowledge those gaps and provide recommendations based on the available information.\n"
+         "4. If there are any areas that require further clarification or testing, suggest appropriate next steps.\n"
+         "5. Make sure your language is clear, professional, and appropriate for medical or business context.\n"
+         "6. If the report includes complex medical terminology, offer recommendations in a simplified and accessible way.\n"
+         "7. Provide recommendations that focus on the immediate next steps or long-term considerations.\n"
+         """ 
+            wrap the output in this format and provide no other text\n{format_instructions}
+         """),
+        ("human", "{query}"),
+        ("placeholder", "{chat_history}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ]
+).partial(format_instructions=parser.get_format_instructions())
 
-     EXPECTED OUTPUT STRUCTURE:
-     {format_instructions}
+# Create the agent for recommendations
+llm = model
+recommendation_agent = create_tool_calling_agent(
+    llm=llm,
+    tools=[],
+    prompt=recommendation_prompt,
+)
 
-     EXAMPLE OF REQUIRED DEPTH:
-     - Don't say "exercise more" → Specify: "Aerobic exercise 30 minutes, 5x/week, target HR 120-150 bpm, gradual progression"
-     - Don't say "healthy diet" → Specify: "Mediterranean diet: 5 servings vegetables, 2 fruits daily, limit processed foods <10% calories"
-     - Don't say "follow up" → Specify: "Follow up in 2 weeks for BP check, repeat lipids in 3 months, target LDL <100 mg/dL"
+# Create the agent executor for recommendation
+recommendation_agent_chain = AgentExecutor.from_agent_and_tools(
+    agent=recommendation_agent,
+    tools=[],
+    verbose=True,
+)
 
-     Current Date: {current_date}"""),
-    ("human", 
-     """MEDICAL REPORT FOR REVIEW:
-     {medical_report}
+# Function to get recommendations from the report
+def get_report_recommendations(medical_report: str):
+    """
+    Takes in the medical report as input and returns expert recommendations.
+    This function sends the medical report to the recommendation agent for analysis
+    and parses the response.
+    """
+    # Prepare the query with the loaded report content
+    query = f"Provide recommendations based on the following medical report:\n\n{medical_report}"
 
-     PATIENT CONTEXT (if available):
-     - Age: {age}
-     - Gender: {gender}
-     - Current Medications: {current_meds}
-     - Known Allergies: {allergies}
-     - Past Medical History: {past_history}
-     - Social History: {social_history}
-     - Family History: {family_history}
+    # Invoke the recommendation agent with the query
+    raw_response = recommendation_agent_chain.invoke({"query": query})
 
-     Provide comprehensive medical management recommendations as the primary treating physician:""")
-])
+    # Check for the raw response to ensure there is no error
+    if "output" not in raw_response:
+        raise ValueError("Agent did not return a valid response.")
 
-class GeneralMedicalAdvisor:
-    def __init__(self):
-        self.model = model
-        self.parser = parser
-        
-    def get_comprehensive_advice(self, medical_report: str, 
-                               age: Optional[int] = None,
-                               gender: Optional[str] = None,
-                               current_meds: Optional[str] = None,
-                               allergies: Optional[str] = None,
-                               past_history: Optional[str] = None,
-                               social_history: Optional[str] = None,
-                               family_history: Optional[str] = None):
-        """
-        Get comprehensive medical recommendations based on the medical report.
-        """
-        try:
-            format_instructions = parser.get_format_instructions()
-            current_date = datetime.now().strftime("%Y-%m-%d")
-            
-            messages = prompt.format_messages(
-                medical_report=medical_report,
-                age=age or "Not specified",
-                gender=gender or "Not specified",
-                current_meds=current_meds or "None reported",
-                allergies=allergies or "None reported",
-                past_history=past_history or "None reported",
-                social_history=social_history or "Not specified",
-                family_history=family_history or "Not specified",
-                current_date=current_date,
-                format_instructions=format_instructions
-            )
-            
-            response = self.model.invoke(messages)
-            parsed_response = parser.parse(response.content)
-            
-            return parsed_response
-            
-        except Exception as e:
-            raise ValueError(f"Error generating medical advice: {str(e)}")
+    # Parse the response from the agent
+    response = parser.parse(raw_response["output"])
 
-def provide_general_medical_advice(medical_report: str, **patient_context):
-    advisor = GeneralMedicalAdvisor()
-    return advisor.get_comprehensive_advice(medical_report, **patient_context)
+    # Return the recommendations
+    return response.recommendations
