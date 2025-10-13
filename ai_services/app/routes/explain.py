@@ -32,12 +32,10 @@ async def explain_medical_report(file: UploadFile = File(...)):
                 raise HTTPException(status_code=400, detail="Could not read file content as text. Please ensure the file contains readable text.")
         
         # Process the medical report
-        explanation, sources, tools_used = process_medical_report(medical_report)
+        explanation = process_medical_report(medical_report)
         
         return {
             "plain_language_explanation": explanation,
-            "sources": sources,
-            "tools_used": tools_used,
         }
         
     except Exception as e:
