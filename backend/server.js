@@ -10,6 +10,7 @@ import casesRouter from "./routes/casesRoutes.js";
 import indexRouter from "./routes/indexRoutes.js";
 import chatRouter from "./routes/chatRoutes.js";
 import AgentRouter from "./routes/pipeline.js";
+import planRouter from "./routes/planRouter.js";
 const app = express();
 const PORT = process.env.PORT || 4000;
 connectDB();
@@ -25,6 +26,7 @@ app.use('/api/cases', casesRouter);
 app.use('/api/index', indexRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/pipeline', AgentRouter);
+app.use('/api/plan',planRouter);
 
 app.listen(PORT,()=> console.log(`Server is running on port ${PORT}`));
 

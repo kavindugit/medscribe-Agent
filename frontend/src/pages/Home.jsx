@@ -18,7 +18,6 @@ import {
 export default function HomePage() {
   const navigate = useNavigate();
   const { backendUrl, userData } = useContext(AppContent);
-
   const backend_AI = "http://localhost:8001";
 
   // File upload state
@@ -89,7 +88,7 @@ export default function HomePage() {
     }
   };
 
-  // Streaming pipeline runner (patched for raw JSON + SSE)
+  // Streaming pipeline runner
   const runPipeline = async (cleanedText) => {
     try {
       const response = await fetch(`${backend_AI}/pipeline/run`, {
@@ -108,16 +107,14 @@ export default function HomePage() {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // split into events
         const events = buffer.split("\n\n");
-        buffer = events.pop() || ""; // keep incomplete chunk
+        buffer = events.pop() || "";
 
         for (const evt of events) {
           const trimmed = evt.trim();
           if (!trimmed) continue;
 
           try {
-            // Support both "data: ..." and raw JSON
             const jsonStr = trimmed.startsWith("data:")
               ? trimmed.replace(/^data:\s*/, "")
               : trimmed;
@@ -197,11 +194,19 @@ export default function HomePage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate("/login");
-  };
+ 
+const { getUserData } = useContext(AppContent);
 
+const handleLogout = async () => {
+  try {
+    await axios.post(`${backendUrl}/api/auth/logout`, {}, { withCredentials: true });
+  } catch (err) {
+    console.warn("Logout failed or already logged out:", err.message);
+  } finally {
+    await getUserData(); // ✅ resets userData in context
+    window.location.href = "/login"; // ✅ hard reload ensures fresh UI
+  }
+};
   return (
     <div className="min-h-screen w-full bg-slate-950 text-white flex flex-col relative">
       <Backdrop />
@@ -228,7 +233,9 @@ export default function HomePage() {
                 alt="avatar"
                 className="h-9 w-9 rounded-full border border-white/20"
               />
-              <span className="hidden sm:inline">{userData?.name || "Profile"}</span>
+              <span className="hidden sm:inline">
+                {userData?.name || "Profile"}
+              </span>
             </button>
 
             {dropdownOpen && (
@@ -257,11 +264,15 @@ export default function HomePage() {
         </div>
       </nav>
 
+      {/* Main */}
       <main className="flex-1 p-6 space-y-10 max-w-7xl mx-auto w-full">
         {/* Welcome */}
         <section className="text-center">
           <h1 className="text-3xl font-bold">
-            Welcome back, <span className="text-cyan-400">{userData?.name || "Guest"}</span>
+            Welcome back,{" "}
+            <span className="text-cyan-400">
+              {userData?.name || "Guest"}
+            </span>
           </h1>
           <p className="text-sm text-neutral-400 mt-1">
             Your role: {userData?.role || "Patient"}
@@ -300,12 +311,13 @@ export default function HomePage() {
           {error && <p className="mt-2 text-red-400 text-sm">{error}</p>}
           {caseId && !error && (
             <p className="mt-3 text-green-400 text-sm">
-              ✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span>
+              ✅ Uploaded • Case ID:{" "}
+              <span className="text-cyan-400">{caseId}</span>
             </p>
           )}
         </section>
 
-        {/* Outputs */}
+        {/* Agent Outputs */}
         {caseId && (
           <section className="flex flex-col gap-6">
             <AgentPanel title="Summary Agent" icon={<BookOpen />} content={summaryOutput} />
