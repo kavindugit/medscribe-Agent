@@ -7,9 +7,6 @@ import {
   Stethoscope,
   FileUp,
   MessageSquare,
-  ClipboardList,
-  BookOpen,
-  Lightbulb,
   LogOut,
   Settings,
   User,
@@ -19,7 +16,6 @@ import {
 export default function Dev() {
   const navigate = useNavigate();
   const { backendUrl, userData, getUserData, usage } = useContext(AppContent);
-  const backend_AI = "http://localhost:8001"; // FastAPI service
 
   // debug: see plan + remaining in console when available
   useEffect(() => {
@@ -36,12 +32,7 @@ export default function Dev() {
   const [uploading, setUploading] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
 
-  // Agent outputs
-  const [summaryOutput, setSummaryOutput] = useState("");
-  const [classifierOutput, setClassifierOutput] = useState("");
-  const [explainerOutput, setExplainerOutput] = useState("");
-  const [translatorOutput, setTranslatorOutput] = useState("");
-  const [adviceOutput, setAdviceOutput] = useState("");
+  // Agent outputs removed
 
   // Chat state
   const [messages, setMessages] = useState([]);
@@ -85,19 +76,6 @@ export default function Dev() {
 
       setCaseId(data.case_id);
 
-      // 2) Fetch cleaned report text
-      const cleaned = await axios.get(
-        `${backendUrl}/api/cases/${data.case_id}/cleaned`,
-        {
-          withCredentials: true,
-          headers: { "X-User-Id": userData.userId },
-        }
-      );
-      const cleanedText = cleaned.data.cleaned_text;
-
-      // 3) Run pipeline using cleaned text
-      await runPipeline(cleanedText);
-
       // Clear the file input
       setFile(null);
       document.getElementById("reportUpload").value = "";
@@ -114,73 +92,7 @@ export default function Dev() {
     }
   };
 
-  // 🧠 Streaming pipeline runner
-  const runPipeline = async (cleanedText) => {
-    try {
-      const response = await fetch(`${backend_AI}/pipeline/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ medical_report: cleanedText }),
-      });
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split("\n\n");
-        buffer = events.pop() || "";
-
-        for (const evt of events) {
-          const trimmed = evt.trim();
-          if (!trimmed) continue;
-
-          try {
-            const jsonStr = trimmed.startsWith("data:")
-              ? trimmed.replace(/^data:\s*/, "")
-              : trimmed;
-            const data = JSON.parse(jsonStr);
-
-            switch (data.agent) {
-              case "summarizer":
-                setSummaryOutput(data.output);
-                break;
-              case "classifier":
-                setClassifierOutput(
-                  typeof data.output === "object"
-                    ? JSON.stringify(data.output, null, 2)
-                    : data.output
-                );
-                break;
-              case "explainer":
-                setExplainerOutput(
-                  typeof data.output === "object"
-                    ? JSON.stringify(data.output, null, 2)
-                    : data.output
-                );
-                break;
-              case "translator":
-                setTranslatorOutput(data.output);
-                break;
-              case "advisor":
-                setAdviceOutput(data.output);
-                break;
-              default:
-                console.warn("Unknown agent:", data);
-            }
-          } catch (err) {
-            console.error("❌ Failed to parse JSON:", evt, err);
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Pipeline error:", err);
-    }
-  };
+  // Agent UI removed per request
 
   // Chat send
   const handleSend = async () => {
@@ -359,16 +271,7 @@ export default function Dev() {
           )}
         </section>
 
-        {/* Agent Outputs */}
-        {caseId && (
-          <section className="flex flex-col gap-6">
-            <AgentPanel title="Summary Agent" icon={<BookOpen />} content={summaryOutput} />
-            <AgentPanel title="Classifier Agent" icon={<ClipboardList />} content={classifierOutput} />
-            <AgentPanel title="Explainer Agent" icon={<MessageSquare />} content={explainerOutput} />
-            <AgentPanel title="Term Translator" icon={<ClipboardList />} content={translatorOutput} />
-            <AgentPanel title="Advice Agent" icon={<Lightbulb />} content={adviceOutput} />
-          </section>
-        )}
+        {/* Agent Actions + Outputs removed */}
 
         {/* Chatbot */}
         <section className="flex flex-col h-[500px] border border-white/10 rounded-2xl overflow-hidden">
@@ -434,21 +337,6 @@ export default function Dev() {
           </div>
         </section>
       </main>
-    </div>
-  );
-}
-
-// Agent output panel
-function AgentPanel({ title, icon, content }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col hover:scale-[1.02] transition">
-      <div className="flex items-center gap-2 mb-3 text-cyan-300">
-        {icon}
-        <h3 className="font-semibold">{title}</h3>
-      </div>
-      <div className="flex-1 text-sm text-neutral-200 overflow-y-auto whitespace-pre-line">
-        {content || "Awaiting results..."}
-      </div>
     </div>
   );
 }
