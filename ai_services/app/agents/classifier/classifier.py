@@ -1,14 +1,12 @@
-# app/agents/classifier/classifier.py
-import os
-import getpass
 from langchain.chat_models import init_chat_model
 from langchain.prompts import ChatPromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from langchain.agents import create_tool_calling_agent
 from langchain.agents import AgentExecutor
 from pydantic import BaseModel
-from typing import Dict, List
-
+from typing import Dict, List, Optional
+import os
+import getpass
 
 # Load environment variables
 if not os.environ.get("GOOGLE_API_KEY"):
@@ -17,17 +15,22 @@ if not os.environ.get("GOOGLE_API_KEY"):
 # Initialize the Langchain model
 model = init_chat_model("gemini-2.5-flash", model_provider="google_genai")
 
-class DomainClassification(BaseModel):
+class DomainEntry(BaseModel):
     level: str
     explanation: str
 
+
 class ClassifierOutput(BaseModel):
-    domain_classifications: Dict[str, DomainClassification]
     overall_classification: str
-    missing_data: List[str]
-    confidence: float
-    sources: List[str]
-    tools_used: List[str]
+    domains: Dict[str, DomainEntry]
+    missing_data: Optional[List[str]] = []
+
+
+class CleanedResponse(BaseModel):
+    overall_classification: str
+    domains: Dict[str, DomainEntry]
+    human_readable: Optional[str] = None
+
 # Initialize Pydantic parser
 parser = PydanticOutputParser(pydantic_object=ClassifierOutput)
 
@@ -118,10 +121,39 @@ def classify_report(medical_report: str):
     if "output" not in raw_response:
         raise ValueError("Agent did not return a valid response.")
 
-    # Parse the response from the agent
+    # Parse the response from the agent into the new ClassifierOutput shape
     response = parser.parse(raw_response["output"])
 
-    # Return the classification, sources, and tools used
-    return response
+    # Normalize domains: remove entries marked as 'Unclear / Insufficient Data' if present
+    cleaned_domains = {k: v for k, v in response.domains.items() if v.level != "Unclear / Insufficient Data"}
 
+    # If there are no clear classifications, return a small structured message
+    if not cleaned_domains:
+        return {"message": "No relevant data available."}
 
+    cleaned_response = CleanedResponse(
+        overall_classification=response.overall_classification,
+        domains=cleaned_domains,
+    )
+
+    # Build a user-friendly textual summary
+    lines = []
+    lines.append(f"Overall Classification: {response.overall_classification}\n")
+    for domain_name, entry in cleaned_domains.items():
+        # Ensure explanation is a plain string
+        explanation = entry.explanation if isinstance(entry.explanation, str) else str(entry.explanation)
+        lines.append(f"{domain_name}:\n  - Level: {entry.level}\n  - Explanation: {explanation}\n")
+
+    # Include missing data section if present and non-empty
+    if getattr(response, "missing_data", None):
+        missing = response.missing_data
+        if isinstance(missing, list) and missing:
+            lines.append("Missing data: \n")
+            for m in missing:
+                lines.append(f"  - {m}\n")
+
+    human_text = "\n".join(lines).strip()
+
+    cleaned_response.human_readable = human_text
+
+    return cleaned_response
