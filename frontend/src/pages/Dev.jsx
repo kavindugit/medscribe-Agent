@@ -81,8 +81,9 @@ export default function Dev() {
   }, [messages]);
 
   // 🚀 Upload Handler
-  const onUpload = async () => {
-    if (!file) return alert("Please select a PDF or image file.");
+  const onUpload = async (fileOverride = null) => {
+    const selectedFile = fileOverride || file;
+    if (!selectedFile) return alert("Please select a PDF or image file.");
     if (!userData?.userId) return alert("Please log in first.");
 
     // client-side guard using context usage
@@ -92,7 +93,7 @@ export default function Dev() {
     }
 
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", selectedFile);
 
     try {
       setUploading(true);
@@ -347,14 +348,28 @@ export default function Dev() {
                 id="reportUpload"
                 type="file"
                 accept="application/pdf,image/*,text/plain,.md,audio/*"
-                onChange={(e) => setFile(e.target.files?.[0])}
+                onChange={async (e) => {
+                  const picked = e.target.files?.[0];
+                  if (picked) {
+                    setFile(picked);
+                    await onUpload(picked);
+                  }
+                }}
                 className="hidden"
                 disabled={uploading}
               />
 
               <div className="mt-6 flex items-center justify-center gap-4">
                 <div className="text-sm text-neutral-300">{file ? file.name : "No file chosen"}</div>
-                <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 rounded bg-white/5 text-sm text-neutral-100">Choose File</button>
+                <button
+                  type="button"
+                  aria-label="Choose file to upload"
+                  title="Choose file"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-10 w-10 flex items-center justify-center rounded-full bg-gradient-to-r from-cyan-400 to-emerald-500 text-black shadow-md hover:shadow-lg hover:scale-105 transition"
+                >
+                  <FileUp className="h-5 w-5" />
+                </button>
                 <button onClick={async () => { await onUpload(); if (fileInputRef.current) fileInputRef.current.value = ''; }} disabled={uploading || !file} className="px-4 py-2 rounded bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold disabled:opacity-50">{uploading ? "⏳ Uploading..." : "Upload"}</button>
               </div>
 
