@@ -11,6 +11,7 @@ from app.routes.advisor import router as advisor_router
 from app.chatbot.routes.rag import router as rag_chat_router
 from app.routes.summarizer import router as summarizer_router
 from app.routes.pipeline import router as pipeline_router
+from app.routes.validator import router as validator_router
 from app.vector.indexer import ensure_collection
 from dotenv import load_dotenv
 from app.routes.vector_cleanup import router as vector_cleanup_router
@@ -47,5 +48,6 @@ app.include_router(advisor_router)
 app.include_router(rag_chat_router)
 app.include_router(summarizer_router)
 app.include_router(classifier_router)
+app.include_router(validator_router)
 app.include_router(pipeline_router)
 app.include_router(vector_cleanup_router)  # Add this line to include the vector cleanup router
