@@ -617,7 +617,7 @@ function AgentCard({ title, description, loading, onRun, output, expanded, onTog
       </div>
       {/* Skeleton while loading & expanded but no output yet */}
       {expanded && loading && !output && (
-        <div className="mt-4 space-y-3 animate-pulse">
+  <div className="mt-4 space-y-3 animate-pulse">
           <div className="h-4 w-1/3 rounded bg-white/10" />
           <div className="h-3 w-2/3 rounded bg-white/10" />
           <div className="h-3 w-5/6 rounded bg-white/10" />
@@ -628,9 +628,9 @@ function AgentCard({ title, description, loading, onRun, output, expanded, onTog
       {output && expanded && !loading && (
         render ? render(output) : (
           plain ? (
-            <div className="mt-3 whitespace-pre-line text-sm text-neutral-200 max-h-80 overflow-auto">{output}</div>
+            <div className="mt-3 whitespace-pre-line text-sm text-neutral-200">{output}</div>
           ) : (
-            <pre className="mt-3 whitespace-pre-wrap text-sm text-neutral-200 max-h-80 overflow-auto">{output}</pre>
+            <pre className="mt-3 whitespace-pre-wrap text-sm text-neutral-200">{output}</pre>
           )
         )
       )}
@@ -675,7 +675,7 @@ function renderClassification(raw) {
     }
   }
   return (
-    <div className="mt-4 space-y-4 text-sm text-neutral-200 max-h-96 overflow-auto pr-2">
+  <div className="mt-4 space-y-4 text-sm text-neutral-200 pr-2">
       {overall && (
         <div className="rounded-md bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 border border-cyan-500/30 px-4 py-2">
           <div className="text-xs uppercase tracking-wide text-cyan-300 mb-1">Overall Classification</div>
@@ -725,10 +725,10 @@ function renderExplanations(raw) {
     return { term: block.slice(0, idx).trim(), text: block.slice(idx + 1).trim() };
   }).filter(Boolean);
   if (!pairs.length) {
-    return <div className="mt-3 whitespace-pre-line text-sm text-neutral-300">{raw}</div>;
+    return <div className="mt-3 whitespace-pre-line text-sm text-neutral-300 max-h-[38rem] overflow-auto pr-2">{raw}</div>;
   }
   return (
-    <div className="mt-4 space-y-3 text-sm max-h-96 overflow-auto pr-2">
+    <div className="mt-4 space-y-3 text-sm pr-2 max-h-[38rem] overflow-auto">
       {pairs.map(p => (
         <div key={p.term} className="group rounded-md border border-white/10 bg-white/5 p-3 hover:border-cyan-400/40 transition">
           <div className="font-medium text-cyan-300 mb-1">{p.term}</div>
@@ -744,7 +744,7 @@ function renderSummary(raw) {
   if (!raw) return null;
   const sections = raw.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
   return (
-    <div className="mt-4 space-y-4 text-sm max-h-96 overflow-auto pr-2">
+  <div className="mt-4 space-y-4 text-sm pr-2">
       {sections.map((sec, idx) => {
         const lines = sec.split(/\n/).filter(Boolean);
         let firstLine = lines[0];
@@ -812,7 +812,7 @@ function renderRecommendations(raw) {
   };
 
   return (
-    <div className="mt-4 space-y-5 text-sm max-h-96 overflow-auto pr-2">
+  <div className="mt-4 space-y-5 text-sm pr-2">
       {order.filter(cat => categories[cat].length).map(cat => (
         <div key={cat} className="rounded-lg border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-4">
           <div className="flex items-center justify-between mb-2">
@@ -865,7 +865,7 @@ function renderTranslation(raw) {
   });
   const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
   return (
-    <div className="mt-4 space-y-4 text-sm max-h-96 overflow-auto pr-2">
+  <div className="mt-4 space-y-4 text-sm pr-2">
       <div className="flex items-center gap-2 text-xs text-neutral-400">
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 text-cyan-300">Translation</span>
         <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{wordCount} words</span>
