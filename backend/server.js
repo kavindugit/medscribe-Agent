@@ -13,6 +13,7 @@ import chatRouter from "./routes/chatRoutes.js";
 import AgentRouter from "./routes/pipeline.js";
 import planRouter from "./routes/planRouter.js";
 import usageRouter from "./routes/usageRouter.js";
+import insightRouter from "./routes/insightHistoryRoutes.js"; // ✅ new insights route
 
 import cron from "node-cron";  // ✅ new
 import { downgradeExpiredPlans } from "./controllers/planController.js"; // ✅ import your controller
@@ -37,6 +38,7 @@ app.use('/api/chat', chatRouter);
 app.use('/api/pipeline', AgentRouter);
 app.use('/api/plan', planRouter);
 app.use('/api/usage', usageRouter);
+app.use('/api/insights', insightRouter); // ✅ new insights route
 
 // ✅ CRON JOB (runs every midnight)
 cron.schedule("0 0 * * *", async () => {
