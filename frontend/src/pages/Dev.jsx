@@ -31,6 +31,36 @@ export default function Dev() {
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
+  const [cleanedText, setCleanedText] = useState("");
+
+  // Agent card state
+  const [cardOutputs, setCardOutputs] = useState({
+    explanation: "",
+    recommendation: "",
+    summary: "",
+    summaryTranslation: "",
+    classification: "",
+    adviceTranslation: "",
+  });
+  const [cardExpanded, setCardExpanded] = useState({
+    explanation: false,
+    recommendation: false,
+    summary: false,
+    summaryTranslation: false,
+    classification: false,
+    adviceTranslation: false,
+  });
+  const [cardLoading, setCardLoading] = useState({
+    explanation: false,
+    recommendation: false,
+    summary: false,
+    summaryTranslation: false,
+    classification: false,
+    adviceTranslation: false,
+  });
+
+  // FastAPI base (CORS allowed in ai_services)
+  const backendAI = "http://localhost:8001";
 
   // Agent outputs removed
 
@@ -76,6 +106,21 @@ export default function Dev() {
 
       setCaseId(data.case_id);
 
+      // Fetch cleaned report text for this case (used by cards)
+      try {
+        const cleaned = await axios.get(
+          `${backendUrl}/api/cases/${data.case_id}/cleaned`,
+          {
+            withCredentials: true,
+            headers: { "X-User-Id": userData.userId },
+          }
+        );
+        const ct = cleaned?.data?.cleaned_text || "";
+        setCleanedText(ct);
+      } catch (e) {
+        console.warn("Failed to fetch cleaned text:", e?.message);
+      }
+
       // Clear the file input
       setFile(null);
       document.getElementById("reportUpload").value = "";
@@ -89,6 +134,56 @@ export default function Dev() {
       }
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Helpers for cards
+  const ensureCleanedText = async () => {
+    if (cleanedText) return cleanedText;
+    if (!caseId) throw new Error("No caseId");
+    const cleaned = await axios.get(
+      `${backendUrl}/api/cases/${caseId}/cleaned`,
+      {
+        withCredentials: true,
+        headers: { "X-User-Id": userData.userId },
+      }
+    );
+    const ct = cleaned?.data?.cleaned_text || "";
+    setCleanedText(ct);
+    return ct;
+  };
+
+  const makeFormWithText = (text) => {
+    const file = new File([text], "report.txt", { type: "text/plain" });
+    const form = new FormData();
+    form.append("file", file);
+    return form;
+  };
+
+  const setCardLoadingState = (key, val) =>
+    setCardLoading((prev) => ({ ...prev, [key]: val }));
+  const setExpanded = (key, val) =>
+    setCardExpanded((prev) => ({ ...prev, [key]: val }));
+  const setOutput = (key, val) =>
+    setCardOutputs((prev) => ({ ...prev, [key]: val }));
+
+  // Generic runner for a card
+  const runCard = async (key, endpoint, extract) => {
+    try {
+      setError("");
+      setCardLoadingState(key, true);
+      const text = await ensureCleanedText();
+      if (!text) throw new Error("Cleaned text is empty.");
+      const form = makeFormWithText(text);
+      const { data } = await axios.post(`${backendAI}${endpoint}`, form);
+      const out = extract(data);
+      setOutput(key, out);
+      setExpanded(key, true);
+    } catch (err) {
+      console.error(`${key} error:`, err?.response?.data || err.message);
+      setError(`Failed to run ${key}.`);
+    } finally {
+      setCardLoadingState(key, false);
     }
   };
 
@@ -273,6 +368,94 @@ export default function Dev() {
 
         {/* Agent Actions + Outputs removed */}
 
+        {/* Agent Cards (6) */}
+        {caseId && (
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <AgentCard
+              title="Explanation"
+              description="Explain medical terms in plain language."
+              loading={cardLoading.explanation}
+              expanded={cardExpanded.explanation}
+              onToggle={() => setExpanded("explanation", !cardExpanded.explanation)}
+              onRun={() =>
+                runCard("explanation", "/explain/process", (d) =>
+                  typeof d?.explanations === "object"
+                    ? JSON.stringify(d.explanations, null, 2)
+                    : String(d?.explanations || "")
+                )
+              }
+              output={cardOutputs.explanation}
+            />
+            <AgentCard
+              title="Recommendation"
+              description="Generate patient-friendly recommendations."
+              loading={cardLoading.recommendation}
+              expanded={cardExpanded.recommendation}
+              onToggle={() => setExpanded("recommendation", !cardExpanded.recommendation)}
+              onRun={() =>
+                runCard("recommendation", "/advice/process", (d) =>
+                  d?.toned_recommendations || d?.recommendations || ""
+                )
+              }
+              output={cardOutputs.recommendation}
+            />
+            <AgentCard
+              title="Summary"
+              description="Summarize the report and key findings."
+              loading={cardLoading.summary}
+              expanded={cardExpanded.summary}
+              onToggle={() => setExpanded("summary", !cardExpanded.summary)}
+              onRun={() =>
+                runCard("summary", "/summary/process", (d) =>
+                  d?.toned_summary || d?.summary || ""
+                )
+              }
+              output={cardOutputs.summary}
+            />
+            <AgentCard
+              title="Summary Translation"
+              description="Translate the summary to Sinhala."
+              loading={cardLoading.summaryTranslation}
+              expanded={cardExpanded.summaryTranslation}
+              onToggle={() =>
+                setExpanded("summaryTranslation", !cardExpanded.summaryTranslation)
+              }
+              onRun={() =>
+                runCard("summaryTranslation", "/translate-summary/process", (d) => d?.translation || "")
+              }
+              output={cardOutputs.summaryTranslation}
+            />
+            <AgentCard
+              title="Classification"
+              description="Classify the report across health domains."
+              loading={cardLoading.classification}
+              expanded={cardExpanded.classification}
+              onToggle={() => setExpanded("classification", !cardExpanded.classification)}
+              onRun={() =>
+                runCard("classification", "/classify/process-medical-report", (d) =>
+                  typeof d?.classification === "object"
+                    ? JSON.stringify(d.classification, null, 2)
+                    : String(d?.classification || "")
+                )
+              }
+              output={cardOutputs.classification}
+            />
+            <AgentCard
+              title="Advice Translation"
+              description="Translate the advice to Sinhala."
+              loading={cardLoading.adviceTranslation}
+              expanded={cardExpanded.adviceTranslation}
+              onToggle={() =>
+                setExpanded("adviceTranslation", !cardExpanded.adviceTranslation)
+              }
+              onRun={() =>
+                runCard("adviceTranslation", "/translate-advice/process", (d) => d?.translation || "")
+              }
+              output={cardOutputs.adviceTranslation}
+            />
+          </section>
+        )}
+
         {/* Chatbot */}
         <section className="flex flex-col h-[500px] border border-white/10 rounded-2xl overflow-hidden">
           <header className="p-4 border-b border-white/10 flex items-center gap-2 bg-white/5">
@@ -337,6 +520,40 @@ export default function Dev() {
           </div>
         </section>
       </main>
+    </div>
+  );
+}
+
+// Reusable Agent Card
+function AgentCard({ title, description, loading, onRun, output, expanded, onToggle }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="font-semibold text-cyan-300">{title}</div>
+          <div className="text-xs text-neutral-400">{description}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          {output && (
+            <button
+              onClick={onToggle}
+              className="rounded-md px-3 py-1 text-xs bg-white/10 hover:bg-white/20"
+            >
+              {expanded ? "Collapse" : "Expand"}
+            </button>
+          )}
+          <button
+            onClick={onRun}
+            disabled={loading}
+            className="rounded-md px-3 py-1 text-xs font-semibold bg-gradient-to-r from-cyan-400 to-emerald-500 text-black disabled:opacity-50"
+          >
+            {loading ? "Running…" : "Run"}
+          </button>
+        </div>
+      </div>
+      {output && expanded && (
+        <pre className="mt-3 whitespace-pre-wrap text-sm text-neutral-200 max-h-80 overflow-auto">{output}</pre>
+      )}
     </div>
   );
 }
