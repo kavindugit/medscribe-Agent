@@ -32,8 +32,18 @@ async def classify_medical_report(file: UploadFile = File(...)):
     # Clean up temp file
     os.remove(temp_file_path)
 
-    # ✅ Just return the model as JSON
-    return response.model_dump()
+    # Ensure we return a JSON-serializable payload.
+    try:
+        if hasattr(response, "model_dump"):
+            payload = response.model_dump()
+        elif hasattr(response, "dict"):
+            payload = response.dict()
+        else:
+            payload = response
+    except Exception:
+        payload = response
+
+    return JSONResponse(content=payload)
 
 
 
