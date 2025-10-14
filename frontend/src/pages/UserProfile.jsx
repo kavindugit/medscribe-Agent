@@ -2,12 +2,24 @@
 import React, { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { AppContent } from "../context/AppContext";
-import { ShieldCheck, User, Mail, Phone, MapPin, Calendar, BadgeCheck } from "lucide-react";
+import {
+  ShieldCheck,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  BadgeCheck,
+  Activity,
+} from "lucide-react";
 
 export default function UserProfile() {
   const { backendUrl, userData } = useContext(AppContent);
+  const backend_AI = "http://localhost:8001"; // ✅ FastAPI backend for AI/Insights
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [insights, setInsights] = useState(null);
   const [editing, setEditing] = useState(false);
   const [updates, setUpdates] = useState({});
 
@@ -29,7 +41,22 @@ export default function UserProfile() {
     if (userData?.userId) fetchProfile();
   }, [backendUrl, userData]);
 
-  // Handle updates
+  // Fetch Health Insights from FastAPI backend (MCP-powered)
+  useEffect(() => {
+    const fetchInsights = async () => {
+      try {
+        const { data } = await axios.get(
+          `${backend_AI}/insights/profile/${userData?.userId}`
+        );
+        setInsights(data.insights);
+      } catch (err) {
+        console.warn("⚠️ No health insights yet for this user.");
+      }
+    };
+    if (userData?.userId) fetchInsights();
+  }, [backend_AI, userData]);
+
+  // Handle profile updates
   const handleUpdate = async () => {
     try {
       const { data } = await axios.put(`${backendUrl}/api/user/update`, {
@@ -49,13 +76,12 @@ export default function UserProfile() {
   };
 
   if (loading) return <div className="text-center p-6">Loading profile...</div>;
-
   if (!profile) return <div className="text-center p-6">⚠️ Profile not found</div>;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center py-10 px-4">
       {/* Profile Card */}
-      <div className="max-w-3xl w-full bg-white/5 border border-white/10 rounded-2xl p-8 shadow-xl">
+      <div className="max-w-3xl w-full bg-white/5 border border-white/10 rounded-2xl p-8 shadow-xl mb-10">
         <div className="flex items-center gap-6">
           <img
             src={userData?.avatar || "https://i.pravatar.cc/150?img=20"}
@@ -83,41 +109,7 @@ export default function UserProfile() {
           <InfoCard icon={<Mail />} label="Email" value={profile.email} />
         </div>
 
-        {/* Editable Fields */}
-        {editing && (
-          <div className="mt-6 space-y-4">
-            <input
-              type="text"
-              placeholder="Full Name"
-              defaultValue={profile.name}
-              onChange={(e) => setUpdates({ ...updates, name: e.target.value })}
-              className="w-full p-2 rounded bg-white/10"
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              defaultValue={profile.email}
-              onChange={(e) => setUpdates({ ...updates, email: e.target.value })}
-              className="w-full p-2 rounded bg-white/10"
-            />
-            <input
-              type="text"
-              placeholder="Role"
-              defaultValue={profile.role}
-              onChange={(e) => setUpdates({ ...updates, role: e.target.value })}
-              className="w-full p-2 rounded bg-white/10"
-            />
-            <input
-              type="text"
-              placeholder="Status"
-              defaultValue={profile.status}
-              onChange={(e) => setUpdates({ ...updates, status: e.target.value })}
-              className="w-full p-2 rounded bg-white/10"
-            />
-          </div>
-        )}
-
-        {/* Action Buttons */}
+        {/* Edit buttons */}
         <div className="mt-6 flex gap-4">
           {editing ? (
             <>
@@ -144,10 +136,53 @@ export default function UserProfile() {
           )}
         </div>
       </div>
+
+      {/* Health Insights Section */}
+      <div className="max-w-3xl w-full bg-white/5 border border-white/10 rounded-2xl p-8 shadow-xl">
+        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+          <Activity className="text-cyan-400" /> Health Insights
+        </h2>
+
+        {!insights ? (
+          <p className="text-neutral-400">
+            No insights available yet. Upload a new report to generate progress.
+          </p>
+        ) : (
+          <>
+            <p className="text-neutral-200 mb-6">{insights.summary}</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <MetricCard
+                label="BMI"
+                value={insights.insights.bmi}
+                trend={insights.insights.trend?.bmi}
+              />
+              <MetricCard
+                label="Blood Pressure"
+                value={`${insights.insights.bp_sys}/${insights.insights.bp_dia}`}
+                trend={insights.insights.trend?.bp_sys}
+              />
+              <MetricCard
+                label="HbA1c"
+                value={insights.insights.hba1c}
+                trend={insights.insights.trend?.hba1c}
+              />
+              <MetricCard
+                label="LDL"
+                value={insights.insights.ldl}
+                trend={insights.insights.trend?.ldl}
+              />
+            </div>
+            <div className="mt-6 text-sm text-neutral-400">
+              Last updated: {new Date(insights.timestamp).toLocaleString()}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
+// Small reusable components
 function InfoCard({ icon, label, value }) {
   return (
     <div className="p-4 rounded-lg border border-white/10 bg-white/5">
@@ -155,6 +190,20 @@ function InfoCard({ icon, label, value }) {
         {icon} <span className="text-sm font-semibold">{label}</span>
       </div>
       <p className="text-neutral-200">{value || "N/A"}</p>
+    </div>
+  );
+}
+
+function MetricCard({ label, value, trend }) {
+  return (
+    <div className="p-4 rounded-lg border border-white/10 bg-white/10 text-center">
+      <h3 className="text-cyan-400 font-semibold mb-1">{label}</h3>
+      <p className="text-2xl font-bold text-white">{value ?? "—"}</p>
+      {trend && (
+        <p className={`text-sm ${trend === "↑" ? "text-red-400" : "text-green-400"}`}>
+          {trend === "↑" ? "Increased" : "Improved"}
+        </p>
+      )}
     </div>
   );
 }
