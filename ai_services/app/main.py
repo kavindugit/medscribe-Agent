@@ -10,7 +10,14 @@ from app.routes.explain import router as explain_router
 from app.routes.advisor import router as advisor_router
 from app.chatbot.routes.rag import router as rag_chat_router
 from app.routes.summarizer import router as summarizer_router
+from app.routes.summary_route import router as summary_chain_router
+from app.routes.advice_route import router as advisor_router
+from app.routes.explaine_route import router as explain_router
+from app.routes.classify_route import router as class_router
+from app.routes.translate_adv_route import router as translate_advice_router
+from app.routes.translate_sum_route import router as translate_summary_router
 from app.routes.pipeline import router as pipeline_router
+from app.routes.validator import router as validator_router
 from app.vector.indexer import ensure_collection
 from dotenv import load_dotenv
 from app.routes.vector_cleanup import router as vector_cleanup_router
@@ -46,6 +53,13 @@ app.include_router(explain_router)
 app.include_router(advisor_router)
 app.include_router(rag_chat_router)
 app.include_router(summarizer_router)
+app.include_router(summary_chain_router)
+app.include_router(translate_summary_router) 
+app.include_router(class_router) # New agent chaining route
 app.include_router(classifier_router)
+app.include_router(translate_advice_router)
+app.include_router(advisor_router)
+app.include_router(explain_router)
+app.include_router(validator_router)
 app.include_router(pipeline_router)
 app.include_router(vector_cleanup_router)  # Add this line to include the vector cleanup router

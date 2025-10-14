@@ -1,0 +1,582 @@
+// frontend/src/pages/Dev.jsx (cloned from HomePage.jsx)
+import React, { useContext, useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { AppContent } from "../context/AppContext";
+import {
+  Stethoscope,
+  FileUp,
+  MessageSquare,
+  LogOut,
+  Settings,
+  User,
+  AlertTriangle,
+} from "lucide-react";
+
+export default function Dev() {
+  const navigate = useNavigate();
+  const { backendUrl, userData, getUserData, usage } = useContext(AppContent);
+
+  // debug: see plan + remaining in console when available
+  useEffect(() => {
+    if (userData && usage) {
+      console.log("🧍 User Plan:", userData.plan);
+      console.log("📊 Remaining Reports:", usage.remainingReports);
+    }
+  }, [userData, usage]);
+
+  // Upload + processing state
+  const [file, setFile] = useState(null);
+  const [caseId, setCaseId] = useState("");
+  const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
+  const [cleanedText, setCleanedText] = useState("");
+  const fileInputRef = useRef(null);
+  const [dragActive, setDragActive] = useState(false);
+
+  // Agent card state
+  const [cardOutputs, setCardOutputs] = useState({
+    explanation: "",
+    recommendation: "",
+    summary: "",
+    summaryTranslation: "",
+    classification: "",
+    adviceTranslation: "",
+  });
+  const [cardExpanded, setCardExpanded] = useState({
+    explanation: false,
+    recommendation: false,
+    summary: false,
+    summaryTranslation: false,
+    classification: false,
+    adviceTranslation: false,
+  });
+  const [cardLoading, setCardLoading] = useState({
+    explanation: false,
+    recommendation: false,
+    summary: false,
+    summaryTranslation: false,
+    classification: false,
+    adviceTranslation: false,
+  });
+
+  // FastAPI base (CORS allowed in ai_services)
+  const backendAI = "http://localhost:8001";
+
+  // Agent outputs removed
+
+  // Chat state
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  // Profile dropdown
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // 🚀 Upload Handler
+  const onUpload = async (fileOverride = null) => {
+    const selectedFile = fileOverride || file;
+    if (!selectedFile) return alert("Please select a PDF or image file.");
+    if (!userData?.userId) return alert("Please log in first.");
+
+    // client-side guard using context usage
+    if (usage?.remainingReports === 0) {
+      setLimitReached(true);
+      return;
+    }
+
+    const form = new FormData();
+    form.append("file", selectedFile);
+
+    try {
+      setUploading(true);
+      setError("");
+
+      // 1) Upload the file → create case in backend
+      const { data } = await axios.post(`${backendUrl}/api/cases`, form, {
+        withCredentials: true,
+        headers: { "X-User-Id": userData.userId },
+      });
+
+      if (!data || !data.case_id) throw new Error("Invalid response from server.");
+
+      setCaseId(data.case_id);
+
+      // Fetch cleaned report text for this case (used by cards)
+      try {
+        const cleaned = await axios.get(
+          `${backendUrl}/api/cases/${data.case_id}/cleaned`,
+          {
+            withCredentials: true,
+            headers: { "X-User-Id": userData.userId },
+          }
+        );
+        const ct = cleaned?.data?.cleaned_text || "";
+        setCleanedText(ct);
+      } catch (e) {
+        console.warn("Failed to fetch cleaned text:", e?.message);
+      }
+
+      // Clear the file input
+      setFile(null);
+      document.getElementById("reportUpload").value = "";
+    } catch (err) {
+      console.error("❌ Upload Error:", err?.response?.data || err.message);
+      if (err?.response?.status === 403) {
+        // backend checkPlanLimit blocked it
+        setLimitReached(true);
+      } else {
+        setError("⚠️ Upload failed. Please try again.");
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Helpers for cards
+  const ensureCleanedText = async () => {
+    if (cleanedText) return cleanedText;
+    if (!caseId) throw new Error("No caseId");
+    const cleaned = await axios.get(
+      `${backendUrl}/api/cases/${caseId}/cleaned`,
+      {
+        withCredentials: true,
+        headers: { "X-User-Id": userData.userId },
+      }
+    );
+    const ct = cleaned?.data?.cleaned_text || "";
+    setCleanedText(ct);
+    return ct;
+  };
+
+  const makeFormWithText = (text) => {
+    const file = new File([text], "report.txt", { type: "text/plain" });
+    const form = new FormData();
+    form.append("file", file);
+    return form;
+  };
+
+  const setCardLoadingState = (key, val) =>
+    setCardLoading((prev) => ({ ...prev, [key]: val }));
+  const setExpanded = (key, val) =>
+    setCardExpanded((prev) => ({ ...prev, [key]: val }));
+  const setOutput = (key, val) =>
+    setCardOutputs((prev) => ({ ...prev, [key]: val }));
+
+  // Generic runner for a card
+  const runCard = async (key, endpoint, extract) => {
+    try {
+      setError("");
+      setCardLoadingState(key, true);
+      const text = await ensureCleanedText();
+      if (!text) throw new Error("Cleaned text is empty.");
+      const form = makeFormWithText(text);
+      const { data } = await axios.post(`${backendAI}${endpoint}`, form);
+      const out = extract(data);
+      setOutput(key, out);
+      setExpanded(key, true);
+    } catch (err) {
+      console.error(`${key} error:`, err?.response?.data || err.message);
+      setError(`Failed to run ${key}.`);
+    } finally {
+      setCardLoadingState(key, false);
+    }
+  };
+
+  // Agent UI removed per request
+
+  // Chat send
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    const userMessage = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/chat/rag/chat`,
+        { query: userMessage.content },
+        {
+          withCredentials: true,
+          headers: { "X-User-Id": userData?.userId },
+        }
+      );
+      const botMessage = { role: "assistant", content: data.answer };
+      setMessages((prev) => [...prev, botMessage]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "⚠️ Failed to get a response." },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // 🔒 Logout
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${backendUrl}/api/auth/logout`, {}, { withCredentials: true });
+    } catch (err) {
+      console.warn("Logout failed or already logged out:", err.message);
+    } finally {
+      await getUserData(); // resets context
+      window.location.href = "/login";
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-slate-950 text-white flex flex-col relative">
+      <Backdrop />
+
+      {/* Navbar */}
+      <nav className="flex justify-between items-center px-6 py-4 border-b border-white/10 bg-slate-900/70 backdrop-blur-lg z-10 relative">
+        <div className="flex items-center gap-2">
+          <Stethoscope className="text-cyan-400" />
+          <span className="font-bold text-lg">MedReport Assist</span>
+        </div>
+        <div className="flex items-center gap-6">
+          <button onClick={() => navigate("/reports")}>Reports</button>
+          <button onClick={() => navigate("/pricing")}>Pricing</button>
+          <button onClick={() => navigate("/chat")}>Chat</button>
+
+          {/* Profile dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setDropdownOpen((prev) => !prev)}
+              className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold hover:shadow-lg hover:scale-105 transition"
+            >
+              <img
+                src={userData?.avatar || "https://i.pravatar.cc/40"}
+                alt="avatar"
+                className="h-9 w-9 rounded-full border border-white/20"
+              />
+              <span className="hidden sm:inline">
+                {userData?.name || "Profile"}
+              </span>
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-white/10 rounded-lg shadow-lg z-20 animate-fadeIn">
+                <button
+                  onClick={() => navigate("/profile")}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
+                >
+                  <User className="h-4 w-4 text-cyan-400" /> Profile
+                </button>
+                <button
+                  onClick={() => alert("⚙️ Settings page coming soon!")}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
+                >
+                  <Settings className="h-4 w-4 text-emerald-400" /> Settings
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 text-red-400 transition"
+                >
+                  <LogOut className="h-4 w-4" /> Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      {/* Main */}
+      <main className="flex-1 p-6 space-y-10 max-w-7xl mx-auto w-full">
+        {/* Welcome */}
+        <section className="text-center">
+          <h1 className="text-3xl font-bold">
+            Welcome back,{" "}
+            <span className="text-cyan-400">{userData?.name || "Guest"}</span>
+          </h1>
+          <p className="text-sm text-neutral-400 mt-1">
+            Your role: {userData?.role || "Patient"}
+          </p>
+        </section>
+
+        {/* Upload */}
+        <section className="relative">
+          {limitReached ? (
+            <div className="rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center">
+              <AlertTriangle className="mx-auto h-12 w-12 text-yellow-400 animate-pulse" />
+              <h2 className="text-xl font-semibold text-yellow-300 mt-3">🚫 Free Plan Limit Reached</h2>
+              <p className="text-sm text-neutral-300 mt-1">You’ve used all your <span className="text-cyan-400">Free</span> uploads. Upgrade to unlock more reports and premium features!</p>
+              <button onClick={() => navigate("/pricing")} className="mt-4 px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold">🚀 Upgrade Now</button>
+            </div>
+          ) : (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                const f = e.dataTransfer.files?.[0];
+                if (f) setFile(f);
+              }}
+              className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${dragActive ? 'border-cyan-400 bg-slate-900/60' : 'border-white/10 bg-slate-900/40'}`}>
+
+              <div className="flex items-center justify-center h-40 rounded-lg">
+                <div className="text-center w-full">
+                  <FileUp className={`mx-auto h-12 w-12 text-cyan-400`} />
+                  <h3 className="mt-3 text-lg font-semibold">Upload sources</h3>
+                  <p className="mt-1 text-sm text-neutral-400">Drag & drop or <button type="button" onClick={() => fileInputRef.current?.click()} className="text-cyan-400 underline">choose file</button> to upload</p>
+                  <p className="mt-3 text-xs text-neutral-500">Supported file types: PDF, .txt, Markdown, Audio (e.g. mp3)</p>
+                </div>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                id="reportUpload"
+                type="file"
+                accept="application/pdf,image/*,text/plain,.md,audio/*"
+                onChange={async (e) => {
+                  const picked = e.target.files?.[0];
+                  if (picked) {
+                    setFile(picked);
+                    await onUpload(picked);
+                  }
+                }}
+                className="hidden"
+                disabled={uploading}
+              />
+
+              <div className="mt-6 flex items-center justify-center gap-4">
+                <div className="text-sm text-neutral-300">{file ? file.name : "No file chosen"}</div>
+                <button
+                  type="button"
+                  aria-label="Choose file to upload"
+                  title="Choose file"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-10 w-10 flex items-center justify-center rounded-full bg-gradient-to-r from-cyan-400 to-emerald-500 text-black shadow-md hover:shadow-lg hover:scale-105 transition"
+                >
+                  <FileUp className="h-5 w-5" />
+                </button>
+                <button onClick={async () => { await onUpload(); if (fileInputRef.current) fileInputRef.current.value = ''; }} disabled={uploading || !file} className="px-4 py-2 rounded bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold disabled:opacity-50">{uploading ? "⏳ Uploading..." : "Upload"}</button>
+              </div>
+
+              {error && <p className="mt-3 text-red-400 text-sm">{error}</p>}
+              {caseId && !error && <p className="mt-3 text-green-400 text-sm">✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span></p>}
+            </div>
+          )}
+        </section>
+
+        {/* Agent Actions + Outputs removed */}
+
+        {/* Agent Cards (6) */}
+        {caseId && (
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <AgentCard
+              title="Explanation"
+              description="Explain medical terms in plain language."
+              loading={cardLoading.explanation}
+              expanded={cardExpanded.explanation}
+              onToggle={() => setExpanded("explanation", !cardExpanded.explanation)}
+              onRun={() =>
+                runCard("explanation", "/explain/process", (d) =>
+                  typeof d?.explanations === "object"
+                    ? JSON.stringify(d.explanations, null, 2)
+                    : String(d?.explanations || "")
+                )
+              }
+              output={cardOutputs.explanation}
+            />
+            <AgentCard
+              title="Recommendation"
+              description="Generate patient-friendly recommendations."
+              loading={cardLoading.recommendation}
+              expanded={cardExpanded.recommendation}
+              onToggle={() => setExpanded("recommendation", !cardExpanded.recommendation)}
+              onRun={() =>
+                runCard("recommendation", "/advice/process", (d) =>
+                  d?.toned_recommendations || d?.recommendations || ""
+                )
+              }
+              output={cardOutputs.recommendation}
+            />
+            <AgentCard
+              title="Summary"
+              description="Summarize the report and key findings."
+              loading={cardLoading.summary}
+              expanded={cardExpanded.summary}
+              onToggle={() => setExpanded("summary", !cardExpanded.summary)}
+              onRun={() =>
+                runCard("summary", "/summary/process", (d) =>
+                  d?.toned_summary || d?.summary || ""
+                )
+              }
+              output={cardOutputs.summary}
+            />
+            <AgentCard
+              title="Summary Translation"
+              description="Translate the summary to Sinhala."
+              loading={cardLoading.summaryTranslation}
+              expanded={cardExpanded.summaryTranslation}
+              onToggle={() =>
+                setExpanded("summaryTranslation", !cardExpanded.summaryTranslation)
+              }
+              onRun={() =>
+                runCard("summaryTranslation", "/translate-summary/process", (d) => d?.translation || "")
+              }
+              output={cardOutputs.summaryTranslation}
+            />
+            <AgentCard
+              title="Classification"
+              description="Classify the report across health domains."
+              loading={cardLoading.classification}
+              expanded={cardExpanded.classification}
+              onToggle={() => setExpanded("classification", !cardExpanded.classification)}
+              onRun={() =>
+                runCard("classification", "/classify/process-medical-report", (d) =>
+                  typeof d?.classification === "object"
+                    ? JSON.stringify(d.classification, null, 2)
+                    : String(d?.classification || "")
+                )
+              }
+              output={cardOutputs.classification}
+            />
+            <AgentCard
+              title="Advice Translation"
+              description="Translate the advice to Sinhala."
+              loading={cardLoading.adviceTranslation}
+              expanded={cardExpanded.adviceTranslation}
+              onToggle={() =>
+                setExpanded("adviceTranslation", !cardExpanded.adviceTranslation)
+              }
+              onRun={() =>
+                runCard("adviceTranslation", "/translate-advice/process", (d) => d?.translation || "")
+              }
+              output={cardOutputs.adviceTranslation}
+            />
+          </section>
+        )}
+
+        {/* Chatbot */}
+        <section className="flex flex-col h-[500px] border border-white/10 rounded-2xl overflow-hidden">
+          <header className="p-4 border-b border-white/10 flex items-center gap-2 bg-white/5">
+            <MessageSquare className="text-cyan-400" />
+            <h1 className="text-lg font-semibold">💬 MedReport Chatbot</h1>
+          </header>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950">
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                className={`flex items-end gap-2 ${
+                  m.role === "user" ? "justify-end" : "justify-start"
+                }`}
+              >
+                {m.role === "assistant" && (
+                  <img
+                    src="https://i.pravatar.cc/40?img=65"
+                    alt="bot"
+                    className="h-8 w-8 rounded-full"
+                  />
+                )}
+                <div
+                  className={`max-w-lg rounded-2xl px-4 py-2 text-sm whitespace-pre-line shadow-md ${
+                    m.role === "user"
+                      ? "bg-gradient-to-r from-cyan-500 to-emerald-500 text-black"
+                      : "bg-white/10 text-neutral-100"
+                  }`}
+                >
+                  {m.content}
+                </div>
+                {m.role === "user" && (
+                  <img
+                    src={userData?.avatar || "https://i.pravatar.cc/40"}
+                    alt="me"
+                    className="h-8 w-8 rounded-full"
+                  />
+                )}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="border-t border-white/10 p-4 bg-slate-900">
+            <div className="flex gap-2">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                placeholder="Type your message..."
+                className="flex-1 resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-white focus:outline-none"
+              />
+              <button
+                onClick={handleSend}
+                disabled={loading}
+                className="rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50 hover:scale-105 transition"
+              >
+                {loading ? "..." : "Send"}
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+// Reusable Agent Card
+function AgentCard({ title, description, loading, onRun, output, expanded, onToggle }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="font-semibold text-cyan-300">{title}</div>
+          <div className="text-xs text-neutral-400">{description}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          {output && (
+            <button
+              onClick={onToggle}
+              className="rounded-md px-3 py-1 text-xs bg-white/10 hover:bg-white/20"
+            >
+              {expanded ? "Collapse" : "Expand"}
+            </button>
+          )}
+          <button
+            onClick={onRun}
+            disabled={loading}
+            className="rounded-md px-3 py-1 text-xs font-semibold bg-gradient-to-r from-cyan-400 to-emerald-500 text-black disabled:opacity-50"
+          >
+            {loading ? "Running…" : "Run"}
+          </button>
+        </div>
+      </div>
+      {output && expanded && (
+        <pre className="mt-3 whitespace-pre-wrap text-sm text-neutral-200 max-h-80 overflow-auto">{output}</pre>
+      )}
+    </div>
+  );
+}
+
+// Background
+function Backdrop() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-40">
+      <div className="absolute -top-40 -right-40 h-[40rem] w-[40rem] rounded-full blur-3xl bg-cyan-500/20 animate-pulse" />
+      <div className="absolute -bottom-40 -left-40 h-[40rem] w-[40rem] rounded-full blur-3xl bg-emerald-500/20 animate-pulse" />
+    </div>
+  );
+}
