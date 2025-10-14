@@ -32,6 +32,8 @@ export default function Dev() {
   const [uploading, setUploading] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
   const [cleanedText, setCleanedText] = useState("");
+  const fileInputRef = useRef(null);
+  const [dragActive, setDragActive] = useState(false);
 
   // Agent card state
   const [cardOutputs, setCardOutputs] = useState({
@@ -308,61 +310,57 @@ export default function Dev() {
         </section>
 
         {/* Upload */}
-        <section className="relative rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center overflow-hidden">
-          {uploading && (
-            <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400 animate-[progress_2s_linear_infinite]" />
-          )}
-
-          {/* Limit reached message */}
+        <section className="relative">
           {limitReached ? (
-            <div className="p-6 text-center space-y-4">
+            <div className="rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center">
               <AlertTriangle className="mx-auto h-12 w-12 text-yellow-400 animate-pulse" />
-              <h2 className="text-xl font-semibold text-yellow-300">
-                🚫 Free Plan Limit Reached
-              </h2>
-              <p className="text-sm text-neutral-300">
-                You’ve used all your <span className="text-cyan-400">Free</span> uploads.
-                Upgrade to unlock more reports and premium features!
-              </p>
-              <button
-                onClick={() => navigate("/pricing")}
-                className="mt-2 px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold hover:scale-105 shadow-lg transition"
-              >
-                🚀 Upgrade Now
-              </button>
+              <h2 className="text-xl font-semibold text-yellow-300 mt-3">🚫 Free Plan Limit Reached</h2>
+              <p className="text-sm text-neutral-300 mt-1">You’ve used all your <span className="text-cyan-400">Free</span> uploads. Upgrade to unlock more reports and premium features!</p>
+              <button onClick={() => navigate("/pricing")} className="mt-4 px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold">🚀 Upgrade Now</button>
             </div>
           ) : (
-            <>
-              <FileUp
-                className={`mx-auto h-12 w-12 ${
-                  uploading ? "text-emerald-400 animate-spin" : "text-cyan-400 animate-bounce"
-                }`}
-              />
-              <p className="mt-2 text-sm text-neutral-300">
-                Drag & drop your medical report or select below
-              </p>
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                const f = e.dataTransfer.files?.[0];
+                if (f) setFile(f);
+              }}
+              className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${dragActive ? 'border-cyan-400 bg-slate-900/60' : 'border-white/10 bg-slate-900/40'}`}>
+
+              <div className="flex items-center justify-center h-40 rounded-lg">
+                <div className="text-center w-full">
+                  <FileUp className={`mx-auto h-12 w-12 text-cyan-400`} />
+                  <h3 className="mt-3 text-lg font-semibold">Upload sources</h3>
+                  <p className="mt-1 text-sm text-neutral-400">Drag & drop or <button type="button" onClick={() => fileInputRef.current?.click()} className="text-cyan-400 underline">choose file</button> to upload</p>
+                  <p className="mt-3 text-xs text-neutral-500">Supported file types: PDF, .txt, Markdown, Audio (e.g. mp3)</p>
+                </div>
+              </div>
+
               <input
+                ref={fileInputRef}
                 id="reportUpload"
                 type="file"
-                accept="application/pdf,image/*"
+                accept="application/pdf,image/*,text/plain,.md,audio/*"
                 onChange={(e) => setFile(e.target.files?.[0])}
-                className="mt-4 block w-full text-sm text-neutral-300"
+                className="hidden"
                 disabled={uploading}
               />
-              <button
-                onClick={onUpload}
-                disabled={uploading || !file}
-                className="mt-4 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-6 py-2 text-sm font-semibold text-black hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploading ? "⏳ Uploading..." : "Upload"}
-              </button>
-              {error && <p className="mt-2 text-red-400 text-sm">{error}</p>}
-              {caseId && !error && (
-                <p className="mt-3 text-green-400 text-sm">
-                  ✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span>
-                </p>
-              )}
-            </>
+
+              <div className="mt-6 flex items-center justify-center gap-4">
+                <div className="text-sm text-neutral-300">{file ? file.name : "No file chosen"}</div>
+                <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 rounded bg-white/5 text-sm text-neutral-100">Choose File</button>
+                <button onClick={async () => { await onUpload(); if (fileInputRef.current) fileInputRef.current.value = ''; }} disabled={uploading || !file} className="px-4 py-2 rounded bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold disabled:opacity-50">{uploading ? "⏳ Uploading..." : "Upload"}</button>
+              </div>
+
+              {error && <p className="mt-3 text-red-400 text-sm">{error}</p>}
+              {caseId && !error && <p className="mt-3 text-green-400 text-sm">✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span></p>}
+            </div>
           )}
         </section>
 
