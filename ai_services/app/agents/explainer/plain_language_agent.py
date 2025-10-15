@@ -17,7 +17,7 @@ if not os.environ.get("GOOGLE_API_KEY"):
     os.environ["GOOGLE_API_KEY"] = google_api_key
 
 # Initialize the LangChain model
-model = init_chat_model("gemini-2.0-flash-exp", model_provider="google_genai")
+model = init_chat_model("gemini-2.5-flash-lite", model_provider="google_genai")
 
 # Updated Pydantic model to match the actual output format
 class PlainLanguageResult(BaseModel):
