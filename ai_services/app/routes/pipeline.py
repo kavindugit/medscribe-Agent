@@ -25,7 +25,14 @@ async def run_pipeline(payload: PipelineRequest):
 
         # 2️⃣ Classifier
         classification = classify_report(medical_report)
-        yield f"data: {json.dumps({'agent': 'classifier', 'output': classification.dict()})}\n\n"
+        # If the classifier returned a Pydantic model, convert to dict via model_dump (pydantic v2).
+        try:
+            output = classification.model_dump()
+        except Exception:
+            # fallback for plain dict or older pydantic
+            output = classification.dict() if hasattr(classification, "dict") else classification
+
+        yield f"data: {json.dumps({'agent': 'classifier', 'output': output})}\n\n"
 
         # 3️⃣ Explainer
         explanation, sources, tools = process_medical_report(medical_report)
