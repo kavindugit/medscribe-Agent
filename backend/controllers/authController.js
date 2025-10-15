@@ -90,16 +90,16 @@ export const register = async (req, res) => {
     const mailOptions = {
       from: process.env.SENDER_EMAIL,
       to: newUser.email,
-      subject: "Welcome to MedReport Assist 👋",
-      text: `Hello ${fullName},
+  subject: "Welcome to MedScribe Agent 👋",
+  text: `Hello ${fullName},
 
-Welcome to MedReport Assist!
+Welcome to MedScribe Agent!
 
 You can securely upload medical reports, get plain-language translations of medical terms, generate accurate summaries, and chat with our health assistant.
 
 Start by uploading your first report and exploring your dashboard.
 
-– The MedReport Assist Team`,
+– The MedScribe Agent Team`,
     };
 
     transporter.sendMail(mailOptions).catch((err) => {

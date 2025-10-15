@@ -101,7 +101,7 @@ export default function SignupPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-tight">
-                MedReport Assist
+                MedScribe Agent
               </h1>
               <p className="text-sm text-neutral-300">Create your account</p>
             </div>
@@ -109,7 +109,7 @@ export default function SignupPage() {
 
           <div className="space-y-6">
             <h2 className="text-4xl font-extrabold leading-tight tracking-tight">
-              Join MedReport Assist <br /> for clarity & privacy
+              Join MedScribe Agent <br /> for clarity & privacy
             </h2>
             <ul className="space-y-3 text-neutral-300">
               <li className="flex items-start gap-3">
@@ -127,8 +127,8 @@ export default function SignupPage() {
             </ul>
           </div>
 
-          <footer className="text-xs text-neutral-500">
-            © {new Date().getFullYear()} MedReport Assist • Support tool — not a diagnosis.
+            <footer className="text-xs text-neutral-500">
+            © {new Date().getFullYear()} MedScribe Agent • Support tool — not a diagnosis.
           </footer>
         </section>
 

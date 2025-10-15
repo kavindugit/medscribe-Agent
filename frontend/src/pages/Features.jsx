@@ -85,14 +85,6 @@ export default function Features() {
                   <li key={idx}>• {h}</li>
                 ))}
               </ul>
-              <div className="flex">
-                <button
-                  onClick={() => navigate('/dev')}
-                  className="w-full px-4 py-2 rounded-lg bg-emerald-500 text-black font-semibold hover:bg-emerald-600 transition"
-                >
-                  Try it
-                </button>
-              </div>
             </div>
           ))}
         </div>

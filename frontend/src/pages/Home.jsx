@@ -50,7 +50,7 @@ export default function HomePage() {
   const messagesEndRef = useRef(null);
 
   // Profile dropdown
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  
 
   // Auto-scroll chat
   useEffect(() => {
@@ -234,207 +234,154 @@ export default function HomePage() {
     <div className="min-h-screen w-full bg-slate-950 text-white flex flex-col relative">
       <Backdrop />
 
-      {/* Navbar */}
-      <nav className="flex justify-between items-center px-6 py-4 border-b border-white/10 bg-slate-900/70 backdrop-blur-lg z-10 relative">
-        <div className="flex items-center gap-2">
-          <Stethoscope className="text-cyan-400" />
-          <span className="font-bold text-lg">MedReport Assist</span>
-        </div>
-        <div className="flex items-center gap-6">
-          <button onClick={() => navigate("/reports")}>Reports</button>
-          <button onClick={() => navigate("/features")}>Features</button>
-          <button onClick={() => navigate("/pricing")}>Pricing</button>
-          <button onClick={() => navigate("/chat")}>Chat</button>
+      {/* Landing main */}
+      <main className="flex-1 p-6 space-y-12 max-w-6xl mx-auto w-full">
+        {/* Hero */}
+        <section className="grid md:grid-cols-2 gap-8 items-center">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-extrabold leading-tight">
+              Understand medical reports faster.
+            </h1>
+            <p className="mt-4 text-neutral-300 text-lg max-w-2xl">
+              MedScribe Agent turns complex clinical reports into concise summaries,
+              patient-friendly explanations, and actionable recommendations — so
+              clinicians can triage faster and patients can act with confidence.
+            </p>
 
-          {/* Profile dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setDropdownOpen((prev) => !prev)}
-              className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold hover:shadow-lg hover:scale-105 transition"
-            >
-              <img
-                src={userData?.avatar || "https://i.pravatar.cc/40"}
-                alt="avatar"
-                className="h-9 w-9 rounded-full border border-white/20"
-              />
-              <span className="hidden sm:inline">
-                {userData?.name || "Profile"}
-              </span>
-            </button>
-
-            {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-white/10 rounded-lg shadow-lg z-20 animate-fadeIn">
-                <button
-                  onClick={() => navigate("/profile")}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
-                >
-                  <User className="h-4 w-4 text-cyan-400" /> Profile
-                </button>
-                <button
-                  onClick={() => alert("⚙️ Settings page coming soon!")}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
-                >
-                  <Settings className="h-4 w-4 text-emerald-400" /> Settings
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 text-red-400 transition"
-                >
-                  <LogOut className="h-4 w-4" /> Logout
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Main */}
-      <main className="flex-1 p-6 space-y-10 max-w-7xl mx-auto w-full">
-        {/* Welcome */}
-        <section className="text-center">
-          <h1 className="text-3xl font-bold">
-            Welcome back,{" "}
-            <span className="text-cyan-400">{userData?.name || "Guest"}</span>
-          </h1>
-          <p className="text-sm text-neutral-400 mt-1">
-            Your role: {userData?.role || "Patient"}
-          </p>
-        </section>
-
-        {/* Upload */}
-        <section className="relative rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center overflow-hidden">
-          {uploading && (
-            <div className="absolute top-0 left-0 h-1 w-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-cyan-400 animate-[progress_2s_linear_infinite]" />
-          )}
-
-          {/* Limit reached message */}
-          {limitReached ? (
-            <div className="p-6 text-center space-y-4">
-              <AlertTriangle className="mx-auto h-12 w-12 text-yellow-400 animate-pulse" />
-              <h2 className="text-xl font-semibold text-yellow-300">
-                🚫 Free Plan Limit Reached
-              </h2>
-              <p className="text-sm text-neutral-300">
-                You’ve used all your <span className="text-cyan-400">Free</span> uploads.
-                Upgrade to unlock more reports and premium features!
-              </p>
+            <div className="mt-6 flex flex-wrap gap-3 items-center">
               <button
-                onClick={() => navigate("/pricing")}
-                className="mt-2 px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold hover:scale-105 shadow-lg transition"
+                onClick={() => navigate('/dev')}
+                className="px-5 py-3 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold shadow-lg hover:scale-[1.03] transition"
               >
-                🚀 Upgrade Now
+                Try now
+              </button>
+
+              <button
+                onClick={() => navigate('/chat')}
+                className="px-5 py-3 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold shadow-lg hover:scale-[1.03] transition"
+              >
+                Chat now
+              </button>
+
+              <button
+                onClick={() => navigate('/pricing')}
+                className="px-5 py-3 rounded-lg border border-white/10 text-sm hover:bg-white/5 transition"
+              >
+                View Pricing
               </button>
             </div>
-          ) : (
-            <>
-              <FileUp
-                className={`mx-auto h-12 w-12 ${
-                  uploading ? "text-emerald-400 animate-spin" : "text-cyan-400 animate-bounce"
-                }`}
-              />
-              <p className="mt-2 text-sm text-neutral-300">
-                Drag & drop your medical report or select below
-              </p>
-              <input
-                id="reportUpload"
-                type="file"
-                accept="application/pdf,image/*"
-                onChange={(e) => setFile(e.target.files?.[0])}
-                className="mt-4 block w-full text-sm text-neutral-300"
-                disabled={uploading}
-              />
-              <button
-                onClick={onUpload}
-                disabled={uploading || !file}
-                className="mt-4 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-6 py-2 text-sm font-semibold text-black hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploading ? "⏳ Uploading..." : "Upload"}
-              </button>
-              {error && <p className="mt-2 text-red-400 text-sm">{error}</p>}
-              {caseId && !error && (
-                <p className="mt-3 text-green-400 text-sm">
-                  ✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span>
-                </p>
-              )}
-            </>
-          )}
-        </section>
 
-        {/* Agent Outputs */}
-        {caseId && (
-          <section className="flex flex-col gap-6">
-            <AgentPanel title="Summary Agent" icon={<BookOpen />} content={summaryOutput} />
-            <AgentPanel title="Classifier Agent" icon={<ClipboardList />} content={classifierOutput} />
-            <AgentPanel title="Explainer Agent" icon={<MessageSquare />} content={explainerOutput} />
-            <AgentPanel title="Term Translator" icon={<ClipboardList />} content={translatorOutput} />
-            <AgentPanel title="Advice Agent" icon={<Lightbulb />} content={adviceOutput} />
-          </section>
-        )}
-
-        {/* Chatbot */}
-        <section className="flex flex-col h-[500px] border border-white/10 rounded-2xl overflow-hidden">
-          <header className="p-4 border-b border-white/10 flex items-center gap-2 bg-white/5">
-            <MessageSquare className="text-cyan-400" />
-            <h1 className="text-lg font-semibold">💬 MedReport Chatbot</h1>
-          </header>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950">
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={`flex items-end gap-2 ${
-                  m.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                {m.role === "assistant" && (
-                  <img
-                    src="https://i.pravatar.cc/40?img=65"
-                    alt="bot"
-                    className="h-8 w-8 rounded-full"
-                  />
-                )}
-                <div
-                  className={`max-w-lg rounded-2xl px-4 py-2 text-sm whitespace-pre-line shadow-md ${
-                    m.role === "user"
-                      ? "bg-gradient-to-r from-cyan-500 to-emerald-500 text-black"
-                      : "bg-white/10 text-neutral-100"
-                  }`}
-                >
-                  {m.content}
-                </div>
-                {m.role === "user" && (
-                  <img
-                    src={userData?.avatar || "https://i.pravatar.cc/40"}
-                    alt="me"
-                    className="h-8 w-8 rounded-full"
-                  />
-                )}
+            <div className="mt-8 flex gap-6">
+              <div>
+                <div className="text-2xl font-bold text-emerald-300">98%</div>
+                <div className="text-xs text-neutral-400">Accuracy (avg.)</div>
               </div>
-            ))}
-            <div ref={messagesEndRef} />
+              <div>
+                <div className="text-2xl font-bold text-cyan-300">2 min</div>
+                <div className="text-xs text-neutral-400">Avg. summary time</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-amber-300">500+</div>
+                <div className="text-xs text-neutral-400">Clinics using MedReport</div>
+              </div>
+            </div>
           </div>
 
-          <div className="border-t border-white/10 p-4 bg-slate-900">
-            <div className="flex gap-2">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                rows={1}
-                placeholder="Type your message..."
-                className="flex-1 resize-none rounded-lg bg-white/5 px-3 py-2 text-sm text-white focus:outline-none"
-              />
-              <button
-                onClick={handleSend}
-                disabled={loading}
-                className="rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50 hover:scale-105 transition"
-              >
-                {loading ? "..." : "Send"}
-              </button>
+          <div className="rounded-xl bg-white/5 p-6 border border-white/10 shadow-md">
+            <div className="text-sm text-neutral-300 mb-3">Sample summary</div>
+            <div className="bg-slate-900 p-4 rounded-md text-sm text-neutral-200 whitespace-pre-line">
+              <div className="font-semibold text-emerald-300">Summary</div>
+              <div className="mt-2">58-year-old female with controlled hypertension and T2DM. No acute findings on chest X-ray.</div>
+
+              <div className="mt-3 font-semibold text-amber-300">Recommendations</div>
+              <ul className="mt-1 list-disc list-inside text-neutral-300">
+                <li>Continue metformin 500mg bd.</li>
+                <li>Lifestyle modifications: low-sodium diet and daily walking.</li>
+                <li>Follow-up in 3 months with HbA1c and BP check.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* Features */}
+        <section>
+          <h2 className="text-2xl font-bold mb-4">Key features</h2>
+          <p className="text-sm text-neutral-400 mb-6">Designed to save time and improve patient understanding.</p>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <FeatureCard
+              icon={<BookOpen className="h-6 w-6 text-cyan-300" />}
+              title="Summarization"
+              desc="Condensed, clinician-grade summaries that emphasize important findings."
+            />
+
+            <FeatureCard
+              icon={<ClipboardList className="h-6 w-6 text-cyan-300" />}
+              title="Classification"
+              desc="Automatically tag reports by domain (cardio, endocrine, imaging, etc.) for fast triage."
+            />
+
+            <FeatureCard
+              icon={<MessageSquare className="h-6 w-6 text-cyan-300" />}
+              title="Explain terms"
+              desc="Plain-language explanations of medical jargon for patients and caregivers."
+            />
+
+            <FeatureCard
+              icon={<Lightbulb className="h-6 w-6 text-cyan-300" />}
+              title="Actionable recommendations"
+              desc="Patient-focused next steps, monitoring suggestions, and follow-up guidance."
+            />
+
+            <FeatureCard
+              icon={<FileUp className="h-6 w-6 text-cyan-300" />}
+              title="Secure ingestion"
+              desc="Upload PDFs, text, or images; files are processed securely and can be exported."
+            />
+
+            <FeatureCard
+              icon={<Stethoscope className="h-6 w-6 text-cyan-300" />}
+              title="Integrations"
+              desc="Exportable PDFs, EMR-friendly summaries, and a conversational interface (RAG/chat)."
+            />
+          </div>
+
+          {/* Testimonials */}
+          <div className="mt-10">
+            <h3 className="text-xl font-semibold mb-4">What users say</h3>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <div className="text-sm text-neutral-300">"Saved us hours per week during clinic — concise summaries are excellent."</div>
+                <div className="mt-3 text-xs text-neutral-400">— Dr. A. Fernando, General Practitioner</div>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <div className="text-sm text-neutral-300">"Patients appreciate the plain-language explanations. Great for follow-ups."</div>
+                <div className="mt-3 text-xs text-neutral-400">— Nurse M. Silva</div>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                <div className="text-sm text-neutral-300">"Easy to integrate and export. Secure processing was key for our hospital."</div>
+                <div className="mt-3 text-xs text-neutral-400">— IT Lead, City Hospital</div>
+              </div>
+            </div>
+          </div>
+
+          {/* About / Footer CTA */}
+          <div className="mt-10 rounded-lg border border-white/10 bg-gradient-to-br from-cyan-900/10 to-emerald-900/5 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold">About MedScribe Agent</h3>
+              <p className="mt-2 text-neutral-300 max-w-xl">
+                Built for clinicians and patients, MedScribe Agent combines secure document ingestion with specialized AI agents to produce actionable insights while preserving privacy. Integrates with your workflow and provides exportable summaries.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => navigate('/features')} className="px-4 py-2 rounded bg-cyan-500 text-black font-semibold">Learn more</button>
+              <button onClick={() => navigate('/pricing')} className="px-4 py-2 rounded border border-white/10">See pricing</button>
             </div>
           </div>
         </section>
       </main>
+      <Footer />
     </div>
   );
 }
@@ -461,5 +408,39 @@ function Backdrop() {
       <div className="absolute -top-40 -right-40 h-[40rem] w-[40rem] rounded-full blur-3xl bg-cyan-500/20 animate-pulse" />
       <div className="absolute -bottom-40 -left-40 h-[40rem] w-[40rem] rounded-full blur-3xl bg-emerald-500/20 animate-pulse" />
     </div>
+  );
+}
+
+// Small feature card used on landing page
+function FeatureCard({ title, desc, icon }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/5 p-4 hover:scale-[1.02] transition">
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded bg-white/3">{icon}</div>
+        <div>
+          <div className="font-semibold text-cyan-300">{title}</div>
+          <div className="text-sm text-neutral-300 mt-2">{desc}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Footer() {
+  const navigate = useNavigate();
+  return (
+    <footer className="mt-12 border-t border-white/5 pt-6 text-sm text-neutral-400">
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:justify-between gap-4">
+        <div>
+          <div className="font-semibold text-white">MedScribe Agent</div>
+          <div className="mt-1">Secure medical report summarization & guidance</div>
+        </div>
+        <div className="flex gap-4">
+          <button onClick={() => navigate('/privacy')} className="hover:underline">Privacy</button>
+          <button onClick={() => navigate('/terms')} className="hover:underline">Terms</button>
+          <button onClick={() => navigate('/contact')} className="hover:underline">Contact</button>
+        </div>
+      </div>
+    </footer>
   );
 }

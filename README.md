@@ -1,4 +1,4 @@
-# Agent Collaboration & System Flow — MedReport Assist
+# Agent Collaboration & System Flow — MedScribe Agent
 
 This report describes how our **agentic RAG** system will work end‑to‑end using **React** (frontend), **Express** (backend), and **Python FastAPI** (AI services). It includes architecture diagrams (Mermaid), each agent’s responsibilities and workflows, recommended LLMs/tools, API contracts, development workflow, and privacy/safety notes.
 
