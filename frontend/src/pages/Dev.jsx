@@ -338,7 +338,9 @@ export default function Dev() {
 
               <div className="flex items-center justify-center h-40 rounded-lg">
                 <div className="text-center w-full">
-                  <FileUp className={`mx-auto h-12 w-12 text-cyan-400`} />
+                  <FileUp className={`mx-auto h-12 w-12 ${
+                    uploading ? "text-emerald-400 animate-spin" : "text-cyan-400 animate-bounce"
+                  }`} />
                   <h3 className="mt-3 text-lg font-semibold">Upload sources</h3>
                   <p className="mt-1 text-sm text-neutral-400">Drag & drop or <button type="button" onClick={() => fileInputRef.current?.click()} className="text-cyan-400 underline">choose file</button> to upload</p>
                   <p className="mt-3 text-xs text-neutral-500">Supported file types: PDF, .txt, Markdown, Audio (e.g. mp3)</p>
