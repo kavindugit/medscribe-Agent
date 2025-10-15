@@ -63,6 +63,68 @@ export default function Dev() {
     adviceTranslation: false,
   });
 
+  // 🚀 Run all agents sequentially
+  const runAllAgents = async () => {
+    try {
+      setError("");
+      if (!caseId) {
+        alert("Please upload a report first.");
+        return;
+      }
+      const text = await ensureCleanedText();
+      if (!text) throw new Error("Cleaned text is empty.");
+
+      // Sequential (safer) run — you can change to Promise.all for parallel
+      await runCard(
+        "summary",
+        "/summary/process",
+        (d) => d?.toned_summary || d?.summary || ""
+      );
+      await runCard("classification", "/classify/process-medical-report", (d) =>
+        (() => {
+          const hr = d?.human_readable || d?.classification?.human_readable;
+          if (hr) return String(hr).replace(/\\n/g, "\n");
+          return "No human readable classification available.";
+        })()
+      );
+      await runCard("explanation", "/explain/process", (d) =>
+        (() => {
+          if (d?.human_readable)
+            return String(d.human_readable).replace(/\\n/g, "\n");
+          const expl = d?.explanations;
+          if (!expl) return "No explanations available.";
+          if (typeof expl === "string") return expl.replace(/\\n/g, "\n");
+          if (typeof expl === "object") {
+            return Object.entries(expl)
+              .map(([term, text]) => `${term}: ${String(text).trim()}`)
+              .join("\n\n");
+          }
+          return String(expl);
+        })()
+      );
+      await runCard(
+        "recommendation",
+        "/advice/process",
+        (d) => d?.toned_recommendations || d?.recommendations || ""
+      );
+      await runCard(
+        "summaryTranslation",
+        "/translate-summary/process",
+        (d) => d?.translation || ""
+      );
+      await runCard(
+        "adviceTranslation",
+        "/translate-advice/process",
+        (d) => d?.translation || ""
+      );
+
+      alert("✅ All agents finished successfully!");
+    } catch (err) {
+      console.error("runAllAgents error:", err.message);
+      setError("Failed to run all agents.");
+    }
+  };
+
   // FastAPI base (CORS allowed in ai_services)
   const backendAI = "http://localhost:8001";
 
@@ -107,7 +169,8 @@ export default function Dev() {
         headers: { "X-User-Id": userData.userId },
       });
 
-      if (!data || !data.case_id) throw new Error("Invalid response from server.");
+      if (!data || !data.case_id)
+        throw new Error("Invalid response from server.");
 
       setCaseId(data.case_id);
 
@@ -233,7 +296,11 @@ export default function Dev() {
   // 🔒 Logout
   const handleLogout = async () => {
     try {
-      await axios.post(`${backendUrl}/api/auth/logout`, {}, { withCredentials: true });
+      await axios.post(
+        `${backendUrl}/api/auth/logout`,
+        {},
+        { withCredentials: true }
+      );
     } catch (err) {
       console.warn("Logout failed or already logged out:", err.message);
     } finally {
@@ -317,9 +384,19 @@ export default function Dev() {
           {limitReached ? (
             <div className="rounded-2xl border border-dashed border-white/15 bg-gradient-to-br from-cyan-900/30 to-emerald-900/20 p-10 text-center">
               <AlertTriangle className="mx-auto h-12 w-12 text-yellow-400 animate-pulse" />
-              <h2 className="text-xl font-semibold text-yellow-300 mt-3">🚫 Free Plan Limit Reached</h2>
-              <p className="text-sm text-neutral-300 mt-1">You’ve used all your <span className="text-cyan-400">Free</span> uploads. Upgrade to unlock more reports and premium features!</p>
-              <button onClick={() => navigate("/pricing")} className="mt-4 px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold">🚀 Upgrade Now</button>
+              <h2 className="text-xl font-semibold text-yellow-300 mt-3">
+                🚫 Free Plan Limit Reached
+              </h2>
+              <p className="text-sm text-neutral-300 mt-1">
+                You’ve used all your <span className="text-cyan-400">Free</span>{" "}
+                uploads. Upgrade to unlock more reports and premium features!
+              </p>
+              <button
+                onClick={() => navigate("/pricing")}
+                className="mt-4 px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold"
+              >
+                🚀 Upgrade Now
+              </button>
             </div>
           ) : (
             <div
@@ -334,14 +411,30 @@ export default function Dev() {
                 const f = e.dataTransfer.files?.[0];
                 if (f) setFile(f);
               }}
-              className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${dragActive ? 'border-cyan-400 bg-slate-900/60' : 'border-white/10 bg-slate-900/40'}`}>
-
+              className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${
+                dragActive
+                  ? "border-cyan-400 bg-slate-900/60"
+                  : "border-white/10 bg-slate-900/40"
+              }`}
+            >
               <div className="flex items-center justify-center h-40 rounded-lg">
                 <div className="text-center w-full">
                   <FileUp className={`mx-auto h-12 w-12 text-cyan-400`} />
                   <h3 className="mt-3 text-lg font-semibold">Upload sources</h3>
-                  <p className="mt-1 text-sm text-neutral-400">Drag & drop or <button type="button" onClick={() => fileInputRef.current?.click()} className="text-cyan-400 underline">choose file</button> to upload</p>
-                  <p className="mt-3 text-xs text-neutral-500">Supported file types: PDF, .txt, Markdown, Audio (e.g. mp3)</p>
+                  <p className="mt-1 text-sm text-neutral-400">
+                    Drag & drop or{" "}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-cyan-400 underline"
+                    >
+                      choose file
+                    </button>{" "}
+                    to upload
+                  </p>
+                  <p className="mt-3 text-xs text-neutral-500">
+                    Supported file types: PDF, .txt, Markdown, Audio (e.g. mp3)
+                  </p>
                 </div>
               </div>
 
@@ -362,7 +455,9 @@ export default function Dev() {
               />
 
               <div className="mt-6 flex items-center justify-center gap-4">
-                <div className="text-sm text-neutral-300">{file ? file.name : "No file chosen"}</div>
+                <div className="text-sm text-neutral-300">
+                  {file ? file.name : "No file chosen"}
+                </div>
                 <button
                   type="button"
                   aria-label="Choose file to upload"
@@ -372,11 +467,25 @@ export default function Dev() {
                 >
                   <FileUp className="h-5 w-5" />
                 </button>
-                <button onClick={async () => { await onUpload(); if (fileInputRef.current) fileInputRef.current.value = ''; }} disabled={uploading || !file} className="px-4 py-2 rounded bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold disabled:opacity-50">{uploading ? "⏳ Uploading..." : "Upload"}</button>
+                <button
+                  onClick={async () => {
+                    await onUpload();
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  disabled={uploading || !file}
+                  className="px-4 py-2 rounded bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold disabled:opacity-50"
+                >
+                  {uploading ? "⏳ Uploading..." : "Upload"}
+                </button>
               </div>
 
               {error && <p className="mt-3 text-red-400 text-sm">{error}</p>}
-              {caseId && !error && <p className="mt-3 text-green-400 text-sm">✅ Uploaded • Case ID: <span className="text-cyan-400">{caseId}</span></p>}
+              {caseId && !error && (
+                <p className="mt-3 text-green-400 text-sm">
+                  ✅ Uploaded • Case ID:{" "}
+                  <span className="text-cyan-400">{caseId}</span>
+                </p>
+              )}
             </div>
           )}
         </section>
@@ -385,121 +494,165 @@ export default function Dev() {
 
         {/* Agent Cards (6) - single column, reordered per request */}
         {caseId && (
-          <section className="flex flex-col gap-4">
-            <AgentCard
-              title="Summary"
-              description="Summarize the report and key findings."
-              loading={cardLoading.summary}
-              expanded={cardExpanded.summary}
-              onToggle={() => setExpanded("summary", !cardExpanded.summary)}
-              onRun={() =>
-                runCard("summary", "/summary/process", (d) =>
-                  d?.toned_summary || d?.summary || ""
-                )
-              }
-               output={cardOutputs.summary}
-               render={renderSummary}
-               copyable
-            />
+          <>
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={runAllAgents}
+                className="px-5 py-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold hover:scale-105 shadow-lg transition"
+              >
+                ⚙️ Run All Agents
+              </button>
+            </div>
 
-            <AgentCard
-              title="Classification"
-              description="Classify the report across health domains."
-              loading={cardLoading.classification}
-              expanded={cardExpanded.classification}
-              onToggle={() => setExpanded("classification", !cardExpanded.classification)}
-              onRun={() =>
-                runCard("classification", "/classify/process-medical-report", (d) =>
-                  // Only return the human_readable field (either top-level or nested under classification)
-                  (() => {
-                    const hr = d?.human_readable || d?.classification?.human_readable;
-                    if (hr) return String(hr).replace(/\\n/g, "\n");
-                    return "No human readable classification available.";
-                  })()
-                )
-              }
-              output={cardOutputs.classification}
-              render={renderClassification}
-              copyable
-            />
+            <section className="flex flex-col gap-4">
+              <AgentCard
+                title="Summary"
+                description="Summarize the report and key findings."
+                loading={cardLoading.summary}
+                expanded={cardExpanded.summary}
+                onToggle={() => setExpanded("summary", !cardExpanded.summary)}
+                onRun={() =>
+                  runCard(
+                    "summary",
+                    "/summary/process",
+                    (d) => d?.toned_summary || d?.summary || ""
+                  )
+                }
+                output={cardOutputs.summary}
+                render={renderSummary}
+                copyable
+              />
 
-            <AgentCard
-              title="Explanation"
-              description="Explain medical terms in plain language."
-              loading={cardLoading.explanation}
-              expanded={cardExpanded.explanation}
-              onToggle={() => setExpanded("explanation", !cardExpanded.explanation)}
-              onRun={() =>
-                runCard("explanation", "/explain/process", (d) =>
-                  (() => {
-                    // Accept either human_readable (if backend adds later) or explanations object/string
-                    if (d?.human_readable) return String(d.human_readable).replace(/\\n/g, "\n");
-                    const expl = d?.explanations;
-                    if (!expl) return "No explanations available.";
-                    if (typeof expl === 'string') return expl.replace(/\\n/g, "\n");
-                    if (typeof expl === 'object') {
-                      // Build a readable list: Term: explanation
-                      return Object.entries(expl)
-                        .map(([term, text]) => `${term}: ${String(text).trim()}`)
-                        .join("\n\n");
-                    }
-                    return String(expl);
-                  })()
-                )
-              }
-              output={cardOutputs.explanation}
-              render={renderExplanations}
-              copyable
-            />
+              <AgentCard
+                title="Classification"
+                description="Classify the report across health domains."
+                loading={cardLoading.classification}
+                expanded={cardExpanded.classification}
+                onToggle={() =>
+                  setExpanded("classification", !cardExpanded.classification)
+                }
+                onRun={() =>
+                  runCard(
+                    "classification",
+                    "/classify/process-medical-report",
+                    (d) =>
+                      // Only return the human_readable field (either top-level or nested under classification)
+                      (() => {
+                        const hr =
+                          d?.human_readable ||
+                          d?.classification?.human_readable;
+                        if (hr) return String(hr).replace(/\\n/g, "\n");
+                        return "No human readable classification available.";
+                      })()
+                  )
+                }
+                output={cardOutputs.classification}
+                render={renderClassification}
+                copyable
+              />
 
-            <AgentCard
-              title="Recommendation"
-              description="Generate patient-friendly recommendations."
-              loading={cardLoading.recommendation}
-              expanded={cardExpanded.recommendation}
-              onToggle={() => setExpanded("recommendation", !cardExpanded.recommendation)}
-              onRun={() =>
-                runCard("recommendation", "/advice/process", (d) =>
-                  d?.toned_recommendations || d?.recommendations || ""
-                )
-              }
-               output={cardOutputs.recommendation}
-               render={renderRecommendations}
-               copyable
-            />
+              <AgentCard
+                title="Explanation"
+                description="Explain medical terms in plain language."
+                loading={cardLoading.explanation}
+                expanded={cardExpanded.explanation}
+                onToggle={() =>
+                  setExpanded("explanation", !cardExpanded.explanation)
+                }
+                onRun={() =>
+                  runCard("explanation", "/explain/process", (d) =>
+                    (() => {
+                      // Accept either human_readable (if backend adds later) or explanations object/string
+                      if (d?.human_readable)
+                        return String(d.human_readable).replace(/\\n/g, "\n");
+                      const expl = d?.explanations;
+                      if (!expl) return "No explanations available.";
+                      if (typeof expl === "string")
+                        return expl.replace(/\\n/g, "\n");
+                      if (typeof expl === "object") {
+                        // Build a readable list: Term: explanation
+                        return Object.entries(expl)
+                          .map(
+                            ([term, text]) => `${term}: ${String(text).trim()}`
+                          )
+                          .join("\n\n");
+                      }
+                      return String(expl);
+                    })()
+                  )
+                }
+                output={cardOutputs.explanation}
+                render={renderExplanations}
+                copyable
+              />
 
-            <AgentCard
-              title="Summary Translation"
-              description="Translate the summary to Sinhala."
-              loading={cardLoading.summaryTranslation}
-              expanded={cardExpanded.summaryTranslation}
-              onToggle={() =>
-                setExpanded("summaryTranslation", !cardExpanded.summaryTranslation)
-              }
-              onRun={() =>
-                runCard("summaryTranslation", "/translate-summary/process", (d) => d?.translation || "")
-              }
-               output={cardOutputs.summaryTranslation}
-               render={renderTranslation}
-               copyable
-            />
+              <AgentCard
+                title="Recommendation"
+                description="Generate patient-friendly recommendations."
+                loading={cardLoading.recommendation}
+                expanded={cardExpanded.recommendation}
+                onToggle={() =>
+                  setExpanded("recommendation", !cardExpanded.recommendation)
+                }
+                onRun={() =>
+                  runCard(
+                    "recommendation",
+                    "/advice/process",
+                    (d) => d?.toned_recommendations || d?.recommendations || ""
+                  )
+                }
+                output={cardOutputs.recommendation}
+                render={renderRecommendations}
+                copyable
+              />
 
-            <AgentCard
-              title="Advice Translation"
-              description="Translate the advice to Sinhala."
-              loading={cardLoading.adviceTranslation}
-              expanded={cardExpanded.adviceTranslation}
-              onToggle={() =>
-                setExpanded("adviceTranslation", !cardExpanded.adviceTranslation)
-              }
-              onRun={() =>
-                runCard("adviceTranslation", "/translate-advice/process", (d) => d?.translation || "")
-              }
-               output={cardOutputs.adviceTranslation}
-               render={renderTranslation}
-               copyable
-            />
-          </section>
+              <AgentCard
+                title="Summary Translation"
+                description="Translate the summary to Sinhala."
+                loading={cardLoading.summaryTranslation}
+                expanded={cardExpanded.summaryTranslation}
+                onToggle={() =>
+                  setExpanded(
+                    "summaryTranslation",
+                    !cardExpanded.summaryTranslation
+                  )
+                }
+                onRun={() =>
+                  runCard(
+                    "summaryTranslation",
+                    "/translate-summary/process",
+                    (d) => d?.translation || ""
+                  )
+                }
+                output={cardOutputs.summaryTranslation}
+                render={renderTranslation}
+                copyable
+              />
+
+              <AgentCard
+                title="Advice Translation"
+                description="Translate the advice to Sinhala."
+                loading={cardLoading.adviceTranslation}
+                expanded={cardExpanded.adviceTranslation}
+                onToggle={() =>
+                  setExpanded(
+                    "adviceTranslation",
+                    !cardExpanded.adviceTranslation
+                  )
+                }
+                onRun={() =>
+                  runCard(
+                    "adviceTranslation",
+                    "/translate-advice/process",
+                    (d) => d?.translation || ""
+                  )
+                }
+                output={cardOutputs.adviceTranslation}
+                render={renderTranslation}
+                copyable
+              />
+            </section>
+          </>
         )}
 
         {/* Chatbot */}
@@ -571,7 +724,18 @@ export default function Dev() {
 }
 
 // Reusable Agent Card
-function AgentCard({ title, description, loading, onRun, output, expanded, onToggle, plain = false, render, copyable = false }) {
+function AgentCard({
+  title,
+  description,
+  loading,
+  onRun,
+  output,
+  expanded,
+  onToggle,
+  plain = false,
+  render,
+  copyable = false,
+}) {
   const [copied, setCopied] = React.useState(false);
   const handleCopy = () => {
     if (!output) return;
@@ -591,10 +755,14 @@ function AgentCard({ title, description, loading, onRun, output, expanded, onTog
           {copyable && output && (
             <button
               onClick={handleCopy}
-              className={`rounded-md px-2 py-1 text-xs flex items-center gap-1 ${copied ? 'bg-emerald-500 text-black' : 'bg-white/10 hover:bg-white/20'}`}
+              className={`rounded-md px-2 py-1 text-xs flex items-center gap-1 ${
+                copied
+                  ? "bg-emerald-500 text-black"
+                  : "bg-white/10 hover:bg-white/20"
+              }`}
               title="Copy to clipboard"
             >
-              <CopyIcon className="h-3 w-3" /> {copied ? 'Copied' : 'Copy'}
+              <CopyIcon className="h-3 w-3" /> {copied ? "Copied" : "Copy"}
             </button>
           )}
           {output && (
@@ -617,7 +785,7 @@ function AgentCard({ title, description, loading, onRun, output, expanded, onTog
       </div>
       {/* Skeleton while loading & expanded but no output yet */}
       {expanded && loading && !output && (
-  <div className="mt-4 space-y-3 animate-pulse">
+        <div className="mt-4 space-y-3 animate-pulse">
           <div className="h-4 w-1/3 rounded bg-white/10" />
           <div className="h-3 w-2/3 rounded bg-white/10" />
           <div className="h-3 w-5/6 rounded bg-white/10" />
@@ -625,15 +793,20 @@ function AgentCard({ title, description, loading, onRun, output, expanded, onTog
           <div className="h-3 w-3/4 rounded bg-white/10" />
         </div>
       )}
-      {output && expanded && !loading && (
-        render ? render(output) : (
-          plain ? (
-            <div className="mt-3 whitespace-pre-line text-sm text-neutral-200">{output}</div>
-          ) : (
-            <pre className="mt-3 whitespace-pre-wrap text-sm text-neutral-200">{output}</pre>
-          )
-        )
-      )}
+      {output &&
+        expanded &&
+        !loading &&
+        (render ? (
+          render(output)
+        ) : plain ? (
+          <div className="mt-3 whitespace-pre-line text-sm text-neutral-200">
+            {output}
+          </div>
+        ) : (
+          <pre className="mt-3 whitespace-pre-wrap text-sm text-neutral-200">
+            {output}
+          </pre>
+        ))}
     </div>
   );
 }
@@ -641,30 +814,30 @@ function AgentCard({ title, description, loading, onRun, output, expanded, onTog
 // Classification formatting renderer
 function renderClassification(raw) {
   // Split into sections by blank lines
-  const lines = raw.split(/\r?\n/).filter(l => l.trim().length > 0);
+  const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
   const headingRegex = /^(Overall Classification:)/i;
   const domainRegex = /^([A-Za-z0-9 /]+(?:\s?\/?[A-Za-z0-9 ]*)*):$/;
   let currentDomain = null;
   const domains = [];
   let overall = null;
-  for (let i=0;i<lines.length;i++) {
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (headingRegex.test(line)) {
-      overall = line.replace(/Overall Classification:\s*/i, '').trim();
+      overall = line.replace(/Overall Classification:\s*/i, "").trim();
       continue;
     }
     if (domainRegex.test(line.trim())) {
-      currentDomain = { name: line.replace(/:$/, ''), items: [] };
+      currentDomain = { name: line.replace(/:$/, ""), items: [] };
       domains.push(currentDomain);
       continue;
     }
     // Match list lines possibly with leading spaces: - Level: ... or - Explanation: ...
     if (/^-\s*Level:/i.test(line) || /^-\s*Explanation:/i.test(line)) {
       if (!currentDomain) {
-        currentDomain = { name: 'General', items: [] };
+        currentDomain = { name: "General", items: [] };
         domains.push(currentDomain);
       }
-      currentDomain.items.push(line.replace(/^-\s*/, '').trim());
+      currentDomain.items.push(line.replace(/^-\s*/, "").trim());
       continue;
     }
     // Handle Missing data items (bullets without colon lines aggregated under domain 'Missing data')
@@ -675,43 +848,63 @@ function renderClassification(raw) {
     }
   }
   return (
-  <div className="mt-4 space-y-4 text-sm text-neutral-200 pr-2">
+    <div className="mt-4 space-y-4 text-sm text-neutral-200 pr-2">
       {overall && (
         <div className="rounded-md bg-gradient-to-r from-cyan-500/10 to-emerald-500/10 border border-cyan-500/30 px-4 py-2">
-          <div className="text-xs uppercase tracking-wide text-cyan-300 mb-1">Overall Classification</div>
+          <div className="text-xs uppercase tracking-wide text-cyan-300 mb-1">
+            Overall Classification
+          </div>
           <div className="font-semibold text-emerald-300">{overall}</div>
         </div>
       )}
       <div className="grid md:grid-cols-2 gap-4">
-        {domains.filter(d => !/Missing data/i.test(d.name)).map(d => (
-          <div key={d.name} className="rounded-lg bg-white/5 border border-white/10 p-3">
-            <div className="font-semibold text-cyan-300 mb-1">{d.name}</div>
-            <ul className="space-y-1 list-disc list-inside">
-              {d.items.map((it, idx) => {
-                const parts = it.split(/:\s*/);
-                const label = parts.shift();
-                const value = parts.join(': ').trim();
-                const isLevel = /Level/i.test(label);
-                let badge = null;
-                if (isLevel) {
-                  if (/Normal|Controlled/i.test(value)) badge = 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30';
-                  else if (/Mild|Moderate/i.test(value)) badge = 'bg-amber-500/20 text-amber-300 border-amber-400/30';
-                  else if (/Severe|Critical|High/i.test(value)) badge = 'bg-red-500/20 text-red-300 border-red-400/30';
-                }
-                return (
-                  <li key={idx} className="">
-                    <span className="font-medium text-emerald-300/90">{label}:</span>{' '}
-                    {isLevel && badge ? (
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border align-middle ${badge}`}>{value}</span>
-                    ) : (
-                      <span className="text-neutral-300 leading-relaxed">{value}</span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+        {domains
+          .filter((d) => !/Missing data/i.test(d.name))
+          .map((d) => (
+            <div
+              key={d.name}
+              className="rounded-lg bg-white/5 border border-white/10 p-3"
+            >
+              <div className="font-semibold text-cyan-300 mb-1">{d.name}</div>
+              <ul className="space-y-1 list-disc list-inside">
+                {d.items.map((it, idx) => {
+                  const parts = it.split(/:\s*/);
+                  const label = parts.shift();
+                  const value = parts.join(": ").trim();
+                  const isLevel = /Level/i.test(label);
+                  let badge = null;
+                  if (isLevel) {
+                    if (/Normal|Controlled/i.test(value))
+                      badge =
+                        "bg-emerald-500/20 text-emerald-300 border-emerald-400/30";
+                    else if (/Mild|Moderate/i.test(value))
+                      badge =
+                        "bg-amber-500/20 text-amber-300 border-amber-400/30";
+                    else if (/Severe|Critical|High/i.test(value))
+                      badge = "bg-red-500/20 text-red-300 border-red-400/30";
+                  }
+                  return (
+                    <li key={idx} className="">
+                      <span className="font-medium text-emerald-300/90">
+                        {label}:
+                      </span>{" "}
+                      {isLevel && badge ? (
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-xs font-medium border align-middle ${badge}`}
+                        >
+                          {value}
+                        </span>
+                      ) : (
+                        <span className="text-neutral-300 leading-relaxed">
+                          {value}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
       </div>
     </div>
   );
@@ -719,18 +912,31 @@ function renderClassification(raw) {
 
 // Explanations formatting renderer
 function renderExplanations(raw) {
-  const pairs = raw.split(/\n\n+/).map(block => {
-    const idx = block.indexOf(':');
-    if (idx === -1) return null;
-    return { term: block.slice(0, idx).trim(), text: block.slice(idx + 1).trim() };
-  }).filter(Boolean);
+  const pairs = raw
+    .split(/\n\n+/)
+    .map((block) => {
+      const idx = block.indexOf(":");
+      if (idx === -1) return null;
+      return {
+        term: block.slice(0, idx).trim(),
+        text: block.slice(idx + 1).trim(),
+      };
+    })
+    .filter(Boolean);
   if (!pairs.length) {
-    return <div className="mt-3 whitespace-pre-line text-sm text-neutral-300 max-h-[38rem] overflow-auto pr-2">{raw}</div>;
+    return (
+      <div className="mt-3 whitespace-pre-line text-sm text-neutral-300 max-h-[38rem] overflow-auto pr-2">
+        {raw}
+      </div>
+    );
   }
   return (
     <div className="mt-4 space-y-3 text-sm pr-2 max-h-[38rem] overflow-auto">
-      {pairs.map(p => (
-        <div key={p.term} className="group rounded-md border border-white/10 bg-white/5 p-3 hover:border-cyan-400/40 transition">
+      {pairs.map((p) => (
+        <div
+          key={p.term}
+          className="group rounded-md border border-white/10 bg-white/5 p-3 hover:border-cyan-400/40 transition"
+        >
           <div className="font-medium text-cyan-300 mb-1">{p.term}</div>
           <div className="text-neutral-300 leading-relaxed">{p.text}</div>
         </div>
@@ -742,20 +948,32 @@ function renderExplanations(raw) {
 // Summary renderer
 function renderSummary(raw) {
   if (!raw) return null;
-  const sections = raw.split(/\n{2,}/).map(s => s.trim()).filter(Boolean);
+  const sections = raw
+    .split(/\n{2,}/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   return (
-  <div className="mt-4 space-y-4 text-sm pr-2">
+    <div className="mt-4 space-y-4 text-sm pr-2">
       {sections.map((sec, idx) => {
         const lines = sec.split(/\n/).filter(Boolean);
         let firstLine = lines[0];
         // Strip bold markdown **Heading:** or **Heading** patterns
-        firstLine = firstLine.replace(/^\*\*(.+?)\*\*:?$/, '$1:').replace(/^\*\*(.+?)\*\*/,'$1');
+        firstLine = firstLine
+          .replace(/^\*\*(.+?)\*\*:?$/, "$1:")
+          .replace(/^\*\*(.+?)\*\*/, "$1");
         const heading = firstLine.length < 80 ? firstLine : null;
-        const body = heading ? lines.slice(1).join('\n') : sec;
+        const body = heading ? lines.slice(1).join("\n") : sec;
         return (
-          <div key={idx} className="rounded-lg border border-white/10 bg-white/5 p-4">
-            {heading && <div className="font-semibold text-cyan-300 mb-1">{heading}</div>}
-            <div className="whitespace-pre-line leading-relaxed text-neutral-300">{body}</div>
+          <div
+            key={idx}
+            className="rounded-lg border border-white/10 bg-white/5 p-4"
+          >
+            {heading && (
+              <div className="font-semibold text-cyan-300 mb-1">{heading}</div>
+            )}
+            <div className="whitespace-pre-line leading-relaxed text-neutral-300">
+              {body}
+            </div>
           </div>
         );
       })}
@@ -767,17 +985,28 @@ function renderSummary(raw) {
 function renderRecommendations(raw) {
   if (!raw) return null;
   // Try to parse bullet-like lines
-  const lines = raw.split(/\n/).map(l => l.trim()).filter(Boolean);
+  const lines = raw
+    .split(/\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   const items = [];
   let buffer = [];
-  lines.forEach(l => {
+  lines.forEach((l) => {
     if (/^(?:-|\d+\.|•)/.test(l)) {
-      if (buffer.length) { items.push(buffer.join(' ')); buffer = []; }
-      buffer.push(l.replace(/^(?:-|\d+\.|•)\s*/, ''));
+      if (buffer.length) {
+        items.push(buffer.join(" "));
+        buffer = [];
+      }
+      buffer.push(l.replace(/^(?:-|\d+\.|•)\s*/, ""));
     } else buffer.push(l);
   });
-  if (buffer.length) items.push(buffer.join(' '));
-  if (!items.length) return <div className="mt-3 whitespace-pre-line text-sm text-neutral-300">{raw}</div>;
+  if (buffer.length) items.push(buffer.join(" "));
+  if (!items.length)
+    return (
+      <div className="mt-3 whitespace-pre-line text-sm text-neutral-300">
+        {raw}
+      </div>
+    );
 
   // Basic categorization heuristics
   const categories = {
@@ -785,16 +1014,20 @@ function renderRecommendations(raw) {
     Medication: [],
     Monitoring: [],
     FollowUp: [],
-    Other: [] // will not be rendered per latest requirement
+    Other: [], // will not be rendered per latest requirement
   };
-  const lifestyleRegex = /(diet|exercise|activity|weight|smoking|alcohol|nutrition|walk|lifestyle)/i;
-  const medicationRegex = /(medication|dose|metformin|statin|drug|therapy|take|start|continue)/i;
-  const monitoringRegex = /(monitor|check|track|log|measure|follow your levels|blood pressure|glucose)/i;
-  const followRegex = /(follow-up|consult|see your doctor|appointment|refer|specialist|cardiologist)/i;
+  const lifestyleRegex =
+    /(diet|exercise|activity|weight|smoking|alcohol|nutrition|walk|lifestyle)/i;
+  const medicationRegex =
+    /(medication|dose|metformin|statin|drug|therapy|take|start|continue)/i;
+  const monitoringRegex =
+    /(monitor|check|track|log|measure|follow your levels|blood pressure|glucose)/i;
+  const followRegex =
+    /(follow-up|consult|see your doctor|appointment|refer|specialist|cardiologist)/i;
 
-  items.forEach(text => {
+  items.forEach((text) => {
     // Remove markdown bold wrappers from bullet lines
-    text = text.replace(/^\*\*(.+?)\*\*:?$/, '$1').replace(/\*\*/g,'');
+    text = text.replace(/^\*\*(.+?)\*\*:?$/, "$1").replace(/\*\*/g, "");
     if (lifestyleRegex.test(text)) categories.Lifestyle.push(text);
     else if (medicationRegex.test(text)) categories.Medication.push(text);
     else if (monitoringRegex.test(text)) categories.Monitoring.push(text);
@@ -802,47 +1035,66 @@ function renderRecommendations(raw) {
     else categories.Other.push(text);
   });
 
-  const order = ['Lifestyle','Medication','Monitoring','FollowUp']; // exclude Other visually
+  const order = ["Lifestyle", "Medication", "Monitoring", "FollowUp"]; // exclude Other visually
   const iconMap = {
-    Lifestyle: '🥗',
-    Medication: '💊',
-    Monitoring: '🩺',
-    FollowUp: '📅',
-    Other: '➤'
+    Lifestyle: "🥗",
+    Medication: "💊",
+    Monitoring: "🩺",
+    FollowUp: "📅",
+    Other: "➤",
   };
 
   return (
-  <div className="mt-4 space-y-5 text-sm pr-2">
-      {order.filter(cat => categories[cat].length).map(cat => (
-        <div key={cat} className="rounded-lg border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{iconMap[cat]}</span>
-              <h4 className="font-semibold text-cyan-300 tracking-wide text-sm uppercase">{cat.replace(/FollowUp/,'Follow-Up')}</h4>
+    <div className="mt-4 space-y-5 text-sm pr-2">
+      {order
+        .filter((cat) => categories[cat].length)
+        .map((cat) => (
+          <div
+            key={cat}
+            className="rounded-lg border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-4"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{iconMap[cat]}</span>
+                <h4 className="font-semibold text-cyan-300 tracking-wide text-sm uppercase">
+                  {cat.replace(/FollowUp/, "Follow-Up")}
+                </h4>
+              </div>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">
+                {categories[cat].length}
+              </span>
             </div>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-neutral-300">{categories[cat].length}</span>
+            <ul className="space-y-2">
+              {categories[cat].map((rec, idx) => {
+                // Highlight entire label before first colon, if present
+                const colonIdx = rec.indexOf(":");
+                let label = null;
+                let remainder = rec;
+                if (colonIdx > -1 && colonIdx < 120) {
+                  label = rec.slice(0, colonIdx).trim();
+                  remainder = rec.slice(colonIdx + 1).trim();
+                }
+                return (
+                  <li key={idx} className="group relative pl-3">
+                    <div className="absolute left-0 top-2 h-2 w-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 group-hover:scale-125 transition" />
+                    <span className="text-neutral-300 leading-relaxed">
+                      {label ? (
+                        <>
+                          <span className="font-semibold text-emerald-300">
+                            {label}
+                          </span>
+                          : {remainder}
+                        </>
+                      ) : (
+                        rec
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
-          <ul className="space-y-2">
-            {categories[cat].map((rec, idx) => {
-              // Highlight entire label before first colon, if present
-              const colonIdx = rec.indexOf(':');
-              let label = null; let remainder = rec;
-              if (colonIdx > -1 && colonIdx < 120) {
-                label = rec.slice(0, colonIdx).trim();
-                remainder = rec.slice(colonIdx + 1).trim();
-              }
-              return (
-                <li key={idx} className="group relative pl-3">
-                  <div className="absolute left-0 top-2 h-2 w-2 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 group-hover:scale-125 transition" />
-                  <span className="text-neutral-300 leading-relaxed">
-                    {label ? <><span className="font-semibold text-emerald-300">{label}</span>: {remainder}</> : rec}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
+        ))}
     </div>
   );
 }
@@ -851,31 +1103,42 @@ function renderRecommendations(raw) {
 function renderTranslation(raw) {
   if (!raw) return null;
   // Basic cleanup
-  const cleaned = raw.replace(/\*\*/g, '').trim();
-  const paragraphs = cleaned.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  const cleaned = raw.replace(/\*\*/g, "").trim();
+  const paragraphs = cleaned
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   const bullets = [];
   const finalParas = [];
-  paragraphs.forEach(p => {
+  paragraphs.forEach((p) => {
     const lines = p.split(/\n/);
-    if (lines.every(l => /^[-•]/.test(l.trim()))) {
-      lines.forEach(l => bullets.push(l.replace(/^[-•]\s*/, '').trim()));
+    if (lines.every((l) => /^[-•]/.test(l.trim()))) {
+      lines.forEach((l) => bullets.push(l.replace(/^[-•]\s*/, "").trim()));
     } else {
-      finalParas.push(p.replace(/\n/g,' '));
+      finalParas.push(p.replace(/\n/g, " "));
     }
   });
   const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
   return (
-  <div className="mt-4 space-y-4 text-sm pr-2">
+    <div className="mt-4 space-y-4 text-sm pr-2">
       <div className="flex items-center gap-2 text-xs text-neutral-400">
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 text-cyan-300">Translation</span>
-        <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">{wordCount} words</span>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 border border-cyan-500/30 text-cyan-300">
+          Translation
+        </span>
+        <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+          {wordCount} words
+        </span>
       </div>
-      {finalParas.map((p,i) => (
-        <p key={i} className="leading-relaxed text-neutral-200">{p}</p>
+      {finalParas.map((p, i) => (
+        <p key={i} className="leading-relaxed text-neutral-200">
+          {p}
+        </p>
       ))}
       {!!bullets.length && (
         <ul className="list-disc list-inside space-y-1 text-neutral-200">
-          {bullets.map((b,i)=>(<li key={i}>{b}</li>))}
+          {bullets.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
         </ul>
       )}
     </div>

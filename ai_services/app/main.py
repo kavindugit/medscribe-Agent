@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+import os
 from app.routes.health import router as health_router
 from app.routes.ingest import router as ingest_router
 from app.routes.cases import router as cases_router
@@ -24,7 +24,8 @@ from app.routes.vector_cleanup import router as vector_cleanup_router
 
 
 load_dotenv()
-
+print("🔍 AZURE_OCR_URL:", os.getenv("AZURE_OCR_URL"))
+print("🔍 AZURE_OCR_KEY:", os.getenv("AZURE_OCR_KEY")[:6] if os.getenv("AZURE_OCR_KEY") else None)
 ensure_collection()
 
 app = FastAPI(title="ai_services")
