@@ -74,7 +74,7 @@ export default function LoginPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold tracking-tight">
-                MedReport Assist
+                MedScribe Agent
               </h1>
               <p className="text-sm text-neutral-300">Private • Safe • Cited</p>
             </div>
@@ -100,8 +100,8 @@ export default function LoginPage() {
             </ul>
           </div>
 
-          <footer className="text-xs text-neutral-500">
-            © {new Date().getFullYear()} MedReport Assist • Support tool — not a diagnosis.
+            <footer className="text-xs text-neutral-500">
+            © {new Date().getFullYear()} MedScribe Agent • Support tool — not a diagnosis.
           </footer>
         </section>
 
@@ -211,7 +211,7 @@ export default function LoginPage() {
             </div>
 
             <p className="mt-6 text-center text-sm text-neutral-400">
-              New to MedReport Assist?{" "}
+              New to MedScribe Agent?{" "}
               <a href="/signup" className="text-cyan-300 hover:text-emerald-300">
                 Create an account
               </a>

@@ -139,7 +139,7 @@ export default function Dev() {
   const messagesEndRef = useRef(null);
 
   // Profile dropdown
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  
 
   // Auto-scroll chat
   useEffect(() => {
@@ -406,59 +406,6 @@ export default function Dev() {
   return (
     <div className="min-h-screen w-full bg-slate-950 text-white flex flex-col relative">
       <Backdrop />
-
-      {/* Navbar */}
-      <nav className="flex justify-between items-center px-6 py-4 border-b border-white/10 bg-slate-900/70 backdrop-blur-lg z-10 relative">
-        <div className="flex items-center gap-2">
-          <Stethoscope className="text-cyan-400" />
-          <span className="font-bold text-lg">MedReport Assist</span>
-        </div>
-        <div className="flex items-center gap-6">
-          <button onClick={() => navigate("/reports")}>Reports</button>
-          <button onClick={() => navigate("/pricing")}>Pricing</button>
-          <button onClick={() => navigate("/chat")}>Chat</button>
-
-          {/* Profile dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setDropdownOpen((prev) => !prev)}
-              className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold hover:shadow-lg hover:scale-105 transition"
-            >
-              <img
-                src={userData?.avatar || "https://i.pravatar.cc/40"}
-                alt="avatar"
-                className="h-9 w-9 rounded-full border border-white/20"
-              />
-              <span className="hidden sm:inline">
-                {userData?.name || "Profile"}
-              </span>
-            </button>
-
-            {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-white/10 rounded-lg shadow-lg z-20 animate-fadeIn">
-                <button
-                  onClick={() => navigate("/profile")}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
-                >
-                  <User className="h-4 w-4 text-cyan-400" /> Profile
-                </button>
-                <button
-                  onClick={() => alert("⚙️ Settings page coming soon!")}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
-                >
-                  <Settings className="h-4 w-4 text-emerald-400" /> Settings
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 text-red-400 transition"
-                >
-                  <LogOut className="h-4 w-4" /> Logout
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
 
       {/* Main */}
       <main className="flex-1 p-6 space-y-10 max-w-7xl mx-auto w-full">
