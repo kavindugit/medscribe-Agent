@@ -8,6 +8,7 @@ import UserProfile from './pages/UserProfile'
 import Pricing from './pages/Pricing'
 import Payment from './pages/Payment'
 import Dev from './pages/Dev'
+import Features from './pages/Features'
 
 const App = () => {
   return (
@@ -19,6 +20,7 @@ const App = () => {
         <Route path='/signup' element={<Signup />} />
         <Route path='/profile' element={<UserProfile />} />
         <Route path='/pricing' element={<Pricing />} />
+  <Route path='/features' element={<Features />} />
         <Route path='/payment/:planType' element={<Payment />} />
   <Route path='/dev' element={<Home />} />
 

@@ -18,7 +18,7 @@ if not google_api_key:
     os.environ["GOOGLE_API_KEY"] = getpass.getpass("Enter API key for Google Gemini: ")
 
 # Initialize the Langchain model
-model = init_chat_model("gemini-2.5-flash", model_provider="google_genai")
+model = init_chat_model("gemini-2.5-flash-lite", model_provider="google_genai")
 
 class ToneFeedback(BaseModel):
     toned_message: str  # Modify to directly return the toned message
