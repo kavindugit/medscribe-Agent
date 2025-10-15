@@ -1,3 +1,4 @@
+// backend/models/insightHistoryModel.js
 import mongoose from "mongoose";
 
 const insightHistorySchema = new mongoose.Schema({

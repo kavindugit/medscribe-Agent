@@ -4,6 +4,8 @@ from app.mcp.agent_registry import run_agent
 from app.storage.mongo_client import db
 from app.storage.mongo_client import get_users_collection
 from app.storage.azure_client import get_sas_url
+from app.storage.mongo_client import get_insights_history_collection
+
 
 router = APIRouter(prefix="/insights", tags=["insights"])
 
@@ -40,3 +42,23 @@ def get_user_insight_history(user_id: str):
     for r in records:
         r["_id"] = str(r["_id"])
     return {"count": len(records), "history": records}
+
+@router.get("/trends/{user_id}")
+def get_user_trends(user_id: str):
+    col = get_insights_history_collection()
+    records = list(col.find({"user_id": user_id}, {"_id": 0}).sort("created_at", 1))
+    if not records:
+        return {"count": 0, "message": "No insights found"}
+    return {
+        "count": len(records),
+        "trends": [
+            {
+                "timestamp": r["timestamp"],
+                "fbs": r["insights"].get("fbs"),
+                "ldl": r["insights"].get("ldl"),
+                "hdl": r["insights"].get("hdl"),
+                "haemoglobin": r["insights"].get("haemoglobin"),
+            }
+            for r in records
+        ],
+    }    

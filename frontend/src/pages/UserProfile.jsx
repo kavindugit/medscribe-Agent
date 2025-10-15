@@ -1,4 +1,3 @@
-// frontend/src/pages/UserProfile.jsx
 import React, { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { AppContent } from "../context/AppContext";
@@ -11,15 +10,28 @@ import {
   Calendar,
   BadgeCheck,
   Activity,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
 export default function UserProfile() {
   const { backendUrl, userData } = useContext(AppContent);
-  const backend_AI = "http://localhost:8001"; // ✅ FastAPI backend for AI/Insights
+  const backend_AI = "http://localhost:8001";
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState(null);
+  const [trends, setTrends] = useState([]);
   const [editing, setEditing] = useState(false);
   const [updates, setUpdates] = useState({});
 
@@ -41,14 +53,14 @@ export default function UserProfile() {
     if (userData?.userId) fetchProfile();
   }, [backendUrl, userData]);
 
-  // Fetch Health Insights from FastAPI backend (MCP-powered)
+  // Fetch latest insights
   useEffect(() => {
     const fetchInsights = async () => {
       try {
         const { data } = await axios.get(
           `${backend_AI}/insights/profile/${userData?.userId}`
         );
-        setInsights(data.insights);
+        setInsights(data);
       } catch (err) {
         console.warn("⚠️ No health insights yet for this user.");
       }
@@ -56,7 +68,22 @@ export default function UserProfile() {
     if (userData?.userId) fetchInsights();
   }, [backend_AI, userData]);
 
-  // Handle profile updates
+  // Fetch trend history
+  useEffect(() => {
+    const fetchTrends = async () => {
+      try {
+        const { data } = await axios.get(
+          `${backend_AI}/insights/trends/${userData?.userId}`
+        );
+        if (data.trends) setTrends(data.trends);
+      } catch (err) {
+        console.warn("⚠️ No trend data yet.");
+      }
+    };
+    if (userData?.userId) fetchTrends();
+  }, [backend_AI, userData]);
+
+  // Handle profile update
   const handleUpdate = async () => {
     try {
       const { data } = await axios.put(`${backendUrl}/api/user/update`, {
@@ -70,7 +97,6 @@ export default function UserProfile() {
         setUpdates({});
       }
     } catch (err) {
-      console.error("Update error:", err);
       alert("⚠️ Failed to update profile");
     }
   };
@@ -78,10 +104,13 @@ export default function UserProfile() {
   if (loading) return <div className="text-center p-6">Loading profile...</div>;
   if (!profile) return <div className="text-center p-6">⚠️ Profile not found</div>;
 
+  const latest = insights?.data?.insights || {};
+  const summary = insights?.data?.summary;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center py-10 px-4">
-      {/* Profile Card */}
-      <div className="max-w-3xl w-full bg-white/5 border border-white/10 rounded-2xl p-8 shadow-xl mb-10">
+    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center py-10 px-4 space-y-10">
+      {/* Profile Header */}
+      <div className="max-w-4xl w-full bg-white/5 border border-white/10 rounded-2xl p-8 shadow-xl">
         <div className="flex items-center gap-6">
           <img
             src={userData?.avatar || "https://i.pravatar.cc/150?img=20"}
@@ -90,7 +119,7 @@ export default function UserProfile() {
           />
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              {profile.name}
+              {profile.fullName || profile.name}
               {profile.isVerified && <BadgeCheck className="text-cyan-400" />}
               {profile.isAdmin && <ShieldCheck className="text-red-400" />}
             </h1>
@@ -108,72 +137,72 @@ export default function UserProfile() {
           <InfoCard icon={<MapPin />} label="Address" value={profile.address} />
           <InfoCard icon={<Mail />} label="Email" value={profile.email} />
         </div>
-
-        {/* Edit buttons */}
-        <div className="mt-6 flex gap-4">
-          {editing ? (
-            <>
-              <button
-                onClick={handleUpdate}
-                className="bg-gradient-to-r from-cyan-400 to-emerald-500 text-black font-semibold px-4 py-2 rounded-lg"
-              >
-                Save Changes
-              </button>
-              <button
-                onClick={() => setEditing(false)}
-                className="border border-white/20 px-4 py-2 rounded-lg"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setEditing(true)}
-              className="bg-gradient-to-r from-fuchsia-400 to-pink-500 text-black font-semibold px-4 py-2 rounded-lg"
-            >
-              Edit Profile
-            </button>
-          )}
-        </div>
       </div>
 
-      {/* Health Insights Section */}
-      <div className="max-w-3xl w-full bg-white/5 border border-white/10 rounded-2xl p-8 shadow-xl">
+      {/* Insights Dashboard */}
+      <div className="max-w-4xl w-full bg-white/5 border border-white/10 rounded-2xl p-8 shadow-xl">
         <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-          <Activity className="text-cyan-400" /> Health Insights
+          <Activity className="text-cyan-400" /> Health Progress Dashboard
         </h2>
 
-        {!insights ? (
+        {!latest || Object.keys(latest).length === 0 ? (
           <p className="text-neutral-400">
             No insights available yet. Upload a new report to generate progress.
           </p>
         ) : (
           <>
-            <p className="text-neutral-200 mb-6">{insights.summary}</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <MetricCard
-                label="BMI"
-                value={insights.insights.bmi}
-                trend={insights.insights.trend?.bmi}
-              />
-              <MetricCard
-                label="Blood Pressure"
-                value={`${insights.insights.bp_sys}/${insights.insights.bp_dia}`}
-                trend={insights.insights.trend?.bp_sys}
-              />
-              <MetricCard
-                label="HbA1c"
-                value={insights.insights.hba1c}
-                trend={insights.insights.trend?.hba1c}
-              />
-              <MetricCard
-                label="LDL"
-                value={insights.insights.ldl}
-                trend={insights.insights.trend?.ldl}
-              />
+            <p className="text-neutral-200 mb-6">{summary}</p>
+
+            {/* Key Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <MetricCard label="FBS" value={latest.fbs} unit="mg/dL" />
+              <MetricCard label="LDL" value={latest.ldl} unit="mg/dL" />
+              <MetricCard label="HDL" value={latest.hdl} unit="mg/dL" />
+              <MetricCard label="Haemoglobin" value={latest.haemoglobin} unit="g/dL" />
             </div>
+
+            {/* Trends Chart */}
+            {trends.length > 0 && (
+              <div className="mt-10">
+                <h3 className="text-xl font-semibold mb-4 text-cyan-300">
+                  Historical Trends
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={trends}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="timestamp" tick={{ fill: "#9CA3AF", fontSize: 12 }} />
+                    <YAxis tick={{ fill: "#9CA3AF", fontSize: 12 }} />
+                    <Tooltip contentStyle={{ backgroundColor: "#0f172a", color: "#fff" }} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="fbs"
+                      stroke="#22d3ee"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="ldl"
+                      stroke="#f472b6"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="hdl"
+                      stroke="#4ade80"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
             <div className="mt-6 text-sm text-neutral-400">
-              Last updated: {new Date(insights.timestamp).toLocaleString()}
+              Last updated:{" "}
+              {new Date(insights?.data?.timestamp || Date.now()).toLocaleString()}
             </div>
           </>
         )}
@@ -182,7 +211,7 @@ export default function UserProfile() {
   );
 }
 
-// Small reusable components
+/* Reusable Info Card */
 function InfoCard({ icon, label, value }) {
   return (
     <div className="p-4 rounded-lg border border-white/10 bg-white/5">
@@ -194,16 +223,23 @@ function InfoCard({ icon, label, value }) {
   );
 }
 
-function MetricCard({ label, value, trend }) {
+/* Metric Card */
+function MetricCard({ label, value, unit }) {
+  const good = label === "LDL" ? value < 130 : label === "HDL" ? value >= 40 : true;
+  const trendIcon = good ? (
+    <TrendingUp className="text-green-400" size={18} />
+  ) : (
+    <TrendingDown className="text-red-400" size={18} />
+  );
+
   return (
-    <div className="p-4 rounded-lg border border-white/10 bg-white/10 text-center">
+    <div className="p-4 rounded-lg border border-white/10 bg-white/10 text-center hover:bg-white/20 transition">
       <h3 className="text-cyan-400 font-semibold mb-1">{label}</h3>
-      <p className="text-2xl font-bold text-white">{value ?? "—"}</p>
-      {trend && (
-        <p className={`text-sm ${trend === "↑" ? "text-red-400" : "text-green-400"}`}>
-          {trend === "↑" ? "Increased" : "Improved"}
-        </p>
-      )}
+      <p className="text-2xl font-bold text-white">
+        {value != null ? value : "—"}{" "}
+        <span className="text-sm text-neutral-400">{unit}</span>
+      </p>
+      <div className="flex justify-center items-center mt-1">{trendIcon}</div>
     </div>
   );
 }

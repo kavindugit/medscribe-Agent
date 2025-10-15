@@ -40,30 +40,3 @@ def get_insights_history_collection():
     """Return insights history collection."""
     return db["insights_history"]
 
-# -------------------------------
-# Ensure indexes for performance
-# -------------------------------
-
-def ensure_indexes():
-    """Ensure indexes exist for performance-critical collections."""
-
-    users = db["users"]
-    users.create_index("email", unique=True)
-    users.create_index("user_id", unique=True)
-
-    cases = db["cases"]
-    cases.create_index("user_id", ASCENDING)
-    cases.create_index("created_at", DESCENDING)
-
-    insights = db["insights_history"]
-    insights.create_index("user_id", ASCENDING)
-    insights.create_index("created_at", DESCENDING)
-    insights.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
-
-    print("✅ MongoDB indexes ensured for users, cases, and insights_history")
-
-# Run this automatically on import (you can also call it manually in main.py)
-try:
-    ensure_indexes()
-except Exception as idx_err:
-    print(f"⚠️ Index creation skipped or failed: {idx_err}")
