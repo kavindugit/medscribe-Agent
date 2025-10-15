@@ -242,6 +242,7 @@ export default function HomePage() {
         </div>
         <div className="flex items-center gap-6">
           <button onClick={() => navigate("/reports")}>Reports</button>
+          <button onClick={() => navigate("/features")}>Features</button>
           <button onClick={() => navigate("/pricing")}>Pricing</button>
           <button onClick={() => navigate("/chat")}>Chat</button>
 
