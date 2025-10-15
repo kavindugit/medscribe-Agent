@@ -47,24 +47,24 @@ export default function NavBar() {
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-white/10 rounded-lg shadow-lg z-20 animate-fadeIn">
+            <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-white/10 rounded-lg shadow-lg z-20 animate-fadeIn text-neutral-200">
               <button
                 onClick={() => navigate('/profile')}
                 className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
               >
-                <User className="h-4 w-4 text-cyan-400" /> Profile
+                <User className="h-4 w-4 text-cyan-400" /> <span className="text-neutral-200">Profile</span>
               </button>
               <button
                 onClick={() => alert('⚙️ Settings page coming soon!')}
                 className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 transition"
               >
-                <Settings className="h-4 w-4 text-emerald-400" /> Settings
+                <Settings className="h-4 w-4 text-emerald-400" /> <span className="text-neutral-200">Settings</span>
               </button>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-slate-800 text-red-400 transition"
               >
-                <LogOut className="h-4 w-4" /> Logout
+                <LogOut className="h-4 w-4 text-red-400" /> <span className="text-red-400">Logout</span>
               </button>
             </div>
           )}
