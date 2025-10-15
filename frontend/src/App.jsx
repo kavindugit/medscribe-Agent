@@ -14,7 +14,7 @@ const App = () => {
   return (
     <div>
       <Routes>
-        <Route path='/' element={<Home/>} />
+        <Route path='/' element={<Dev/>} />
         <Route path='/login' element={<Login />} />
         <Route path='/chat' element={<Chat />} />
         <Route path='/signup' element={<Signup />} />
@@ -22,7 +22,7 @@ const App = () => {
         <Route path='/pricing' element={<Pricing />} />
   <Route path='/features' element={<Features />} />
         <Route path='/payment/:planType' element={<Payment />} />
-  <Route path='/dev' element={<Dev />} />
+  <Route path='/dev' element={<Home />} />
 
       </Routes>
  
