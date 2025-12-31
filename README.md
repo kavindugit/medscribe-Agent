@@ -105,7 +105,6 @@ flowchart TD
 | LLM | Google Gemini 2.5 Flash |
 | Vector DB | Qdrant |
 | Storage | MongoDB, Azure Blob |
-| Security | AES-256, PII Redaction |
 
 ---
 
