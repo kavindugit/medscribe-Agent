@@ -63,11 +63,10 @@ flowchart TD
 
 ## 🚀 Key Features
 
-- **16-Agent LangGraph Orchestration**
-- **Bilingual Medical Explanation (English / Sinhala)**
-- **RAG-based “Talk to Your Reports” Chatbot**
-- **AES-256 Encryption & PII Redaction**
-- **Emergency Safety Guardrails**
+* **16-Agent LangGraph Orchestration:** Decomposes complex analysis into specific tasks using specialized agents managed by **LangGraph**.
+* **Bilingual Medical Explanation (English / Sinhala):** Automatically translates summaries, glossaries, and health advice between **English** and **Sinhala**.
+* **RAG-based “Talk to Your Reports” Chatbot:** Uses **Qdrant** vector search to answer follow-up questions grounded strictly in the user's specific report history.
+* **Emergency Safety Guardrails:** Dedicated **Safety Guard** agents detect emergencies (e.g., chest pain) and halt processing to advise urgent care.
 
 ---
 
@@ -107,6 +106,28 @@ flowchart TD
 | Storage | MongoDB, Azure Blob |
 
 ---
+
+## 🌟 Usages & Practical Applications
+
+MedScribe is designed to serve multiple stakeholders in the healthcare ecosystem by bridging the gap between raw medical data and human understanding.
+
+### 1. For Patients: Empowerment & Clarity
+* **Simplify Lab Reports:** Instantly converts complex medical terms (e.g., "High LDL", "Leukocytosis") into plain language explanations.
+* **Bilingual Accessibility:** Translates medical summaries and health advice into **Sinhala**, making healthcare accessible to non-English speakers.
+* **Personalized Health Tips:** Provides non-prescriptive lifestyle and dietary monitoring advice based on specific test results.
+* **Safe Q&A:** Allows patients to ask follow-up questions about their own reports without the risk of hallucinations or unsafe medical advice.
+
+### 2. For Clinicians: Rapid Triage
+* **Time-Saving Summaries:** Generates concise summaries of lengthy reports, highlighting critical abnormalities and severity levels (Normal, At Risk, High Risk).
+* **Structured Data:** Organizes unstructured OCR text into categorized health domains (e.g., Cardiac, Kidney, Diabetes) for quick review.
+
+### 3. For Hospitals & Laboratories
+* **Automated Explanations:** Reduces the workload on staff by automating the "post-report explanation" process for patients.
+* **Digital Transformation:** Converts physical paper reports (PDF/Image) into searchable, digital health records using OCR and Vector Storage.
+
+### 🚨 Emergency Safety Mechanism
+* **Critical Triage:** The system includes a "Safety Guard" agent that detects emergency phrases (e.g., "chest pain", "difficulty breathing").
+* **Immediate Action:** If an emergency is detected, the AI halts processing and immediately directs the user to seek urgent medical care.
 
 ## ⚡ Setup & Installation
 
